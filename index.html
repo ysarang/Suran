@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>수란이 딴짓하면 꿀밤!</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===================== 사이드바 ===================== -->
+  <nav class="sidebar">
+    <div class="sidebar__brand">👊<br>수란이<br>딴짓하면<br>꿀밤!</div>
+    <ul class="sidebar__menu">
+      <li>
+        <button class="menu-btn menu-btn--active" data-view="schedule">
+          <span class="menu-icon">📋</span>
+          <span class="menu-label">강의 스케줄</span>
+        </button>
+      </li>
+      <li>
+        <button class="menu-btn" data-view="calendar">
+          <span class="menu-icon">📅</span>
+          <span class="menu-label">강의 달력</span>
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- ===================== 메인 ===================== -->
+  <main class="main">
+
+    <!-- ── 강의 스케줄 뷰 ── -->
+    <div id="view-schedule" class="view view--active">
+      <div class="container">
+
+        <header class="header">
+          <div>
+            <h1 class="header__title">📋 강의 스케줄</h1>
+            <p class="header__date" id="today-date"></p>
+          </div>
+          <button class="btn btn--primary" id="open-modal-btn">+ 강의 추가</button>
+        </header>
+
+        <!-- 요약 카드 -->
+        <section class="summary">
+          <div class="summary-card">
+            <span class="summary-card__value" id="total-count">0</span>
+            <span class="summary-card__label">전체</span>
+          </div>
+          <div class="summary-card summary-card--done">
+            <span class="summary-card__value" id="done-count">0</span>
+            <span class="summary-card__label">완료</span>
+          </div>
+          <div class="summary-card summary-card--delayed">
+            <span class="summary-card__value" id="delayed-count">0</span>
+            <span class="summary-card__label">밀림</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-card__value" id="overall-rate">0%</span>
+            <span class="summary-card__label">전체 완료율</span>
+          </div>
+        </section>
+
+        <!-- 전체 진행바 -->
+        <div class="progress-wrap">
+          <div class="progress-bar">
+            <div class="progress-bar__fill" id="overall-bar"></div>
+          </div>
+        </div>
+
+        <!-- 과목 필터 -->
+        <div class="subject-filter" id="subject-filter">
+          <button class="subject-btn active" data-subject="all">전체</button>
+          <button class="subject-btn" data-subject="wireless">📡 무선공학</button>
+          <button class="subject-btn" data-subject="electronics">⚡ 전자공학</button>
+          <button class="subject-btn" data-subject="comms">📶 통신공학</button>
+        </div>
+
+        <!-- 주차 탭 -->
+        <nav class="week-tabs" id="week-tabs"></nav>
+
+        <!-- 강의 테이블 -->
+        <section class="table-wrap">
+          <table class="schedule-table" id="schedule-table">
+            <thead>
+              <tr>
+                <th class="th-check"></th>
+                <th>과목</th>
+                <th>강의명</th>
+                <th>진도</th>
+                <th>소요시간</th>
+                <th>마감일</th>
+                <th>상태</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+          <div class="empty-state" id="empty-state">
+            <p class="empty-state__icon">📂</p>
+            <p class="empty-state__text">이 주차에 등록된 강의가 없습니다.</p>
+          </div>
+        </section>
+
+      </div>
+    </div><!-- /view-schedule -->
+
+    <!-- ── 강의 달력 뷰 ── -->
+    <div id="view-calendar" class="view">
+      <div class="container">
+
+        <header class="header">
+          <div>
+            <h1 class="header__title">📅 강의 달력</h1>
+            <p class="header__date" id="cal-today-date"></p>
+          </div>
+        </header>
+
+        <!-- 월 이동 -->
+        <div class="cal-nav">
+          <button class="btn btn--ghost cal-nav__btn" id="cal-prev">◀</button>
+          <h2 class="cal-nav__label" id="cal-month-label"></h2>
+          <button class="btn btn--ghost cal-nav__btn" id="cal-next">▶</button>
+        </div>
+
+        <!-- 달력 그리드 -->
+        <div class="cal-wrap">
+          <div class="cal-days-header">
+            <span>월</span><span>화</span><span>수</span>
+            <span>목</span><span>금</span><span class="sat">토</span><span class="sun">일</span>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+
+        <!-- 범례 -->
+        <div class="cal-legend">
+          <span class="cal-legend__item cal-legend__item--wireless">📡 무선공학</span>
+          <span class="cal-legend__item cal-legend__item--electronics">⚡ 전자공학</span>
+          <span class="cal-legend__item cal-legend__item--comms">📶 통신공학</span>
+          <span class="cal-legend__item cal-legend__item--done">✔ 완료</span>
+        </div>
+
+      </div>
+    </div><!-- /view-calendar -->
+
+  </main>
+</div>
+
+<!-- ===================== 모달 ===================== -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title" id="modal-title">강의 추가</h2>
+      <button class="modal__close" id="close-modal-btn">✕</button>
+    </div>
+    <form class="modal__form" id="course-form" autocomplete="off">
+      <input type="hidden" id="edit-id">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">강의명 <span class="required">*</span></label>
+          <input type="text" class="form-input" id="f-name" placeholder="강의 이름" maxlength="60">
+        </div>
+        <div class="form-group">
+          <label class="form-label">과목 <span class="required">*</span></label>
+          <select class="form-input" id="f-subject">
+            <option value="wireless">📡 무선공학</option>
+            <option value="electronics">⚡ 전자공학</option>
+            <option value="comms">📶 통신공학</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">주차 <span class="required">*</span></label>
+          <select class="form-input" id="f-week"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">상태</label>
+          <select class="form-input" id="f-status">
+            <option value="default">기본</option>
+            <option value="delayed">밀림</option>
+            <option value="done">완료</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">진도</label>
+          <input type="text" class="form-input" id="f-progress" placeholder="강의 번호">
+        </div>
+        <div class="form-group">
+          <label class="form-label">소요시간</label>
+          <input type="text" class="form-input" id="f-duration" placeholder="예: 45분">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">마감일</label>
+        <input type="date" class="form-input" id="f-deadline">
+      </div>
+
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" id="cancel-btn">취소</button>
+        <button type="submit" class="btn btn--primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
