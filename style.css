@@ -147,8 +147,9 @@ body {
 .btn--primary { background: linear-gradient(135deg, var(--primary), var(--primary-lt)); color: #fff; }
 .btn--ghost   { background: transparent; border: 1px solid var(--border); color: var(--muted); }
 .btn--ghost:hover { border-color: var(--primary-lt); color: var(--primary-lt); }
-.btn--icon    { background: transparent; border: none; color: var(--muted); padding: 4px 8px; font-size: 0.8rem; }
-.btn--icon:hover  { color: var(--delayed); }
+.btn--icon       { background: transparent; border: none; color: var(--muted); padding: 4px 8px; font-size: 0.8rem; }
+.btn--icon:hover { color: var(--delayed); }
+.btn--delay:hover { color: var(--default); }
 
 /* ── 배지 ── */
 .badge {
@@ -174,6 +175,22 @@ body {
 .subject-badge--wireless    { background: rgba(56,189,248,0.15); color: var(--wireless);    border: 1px solid rgba(56,189,248,0.3); }
 .subject-badge--electronics { background: rgba(251,146,60,0.15);  color: var(--electronics); border: 1px solid rgba(251,146,60,0.3); }
 .subject-badge--comms       { background: rgba(167,139,250,0.15); color: var(--comms);       border: 1px solid rgba(167,139,250,0.3); }
+.subject-badge--custom      { background: rgba(160,160,180,0.15); color: #aaa;               border: 1px solid rgba(160,160,180,0.3); }
+
+/* ── 색상 스와치 ── */
+.color-swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.color-swatch {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+  transition: transform var(--tr), box-shadow var(--tr);
+}
+.color-swatch:hover  { transform: scale(1.18); }
+.color-swatch.selected {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--text);
+}
 
 /* =============================================================
    5. 스케줄 뷰
@@ -233,7 +250,34 @@ body {
 .subject-btn[data-subject="comms"].active       { background: rgba(167,139,250,0.15); border-color: var(--comms);       color: var(--comms); }
 
 /* ── 주차 탭 ── */
-.week-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.week-tabs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-nav-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  transition: all var(--tr);
+  line-height: 1;
+}
+.week-nav-btn:hover { border-color: var(--primary-lt); color: var(--primary-lt); }
+
+.week-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  scroll-behavior: smooth;
+  flex: 1;
+}
 
 .week-tab {
   background: var(--surface);
@@ -245,6 +289,8 @@ body {
   font-weight: 600;
   padding: 6px 16px;
   transition: all var(--tr);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .week-tab:hover  { border-color: var(--primary-lt); color: var(--primary-lt); }
 .week-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
@@ -390,7 +436,7 @@ body {
 .cal-week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: 36px 36px 36px 36px;
+  grid-template-rows: 36px 36px 36px 36px 36px;
   border-bottom: 1px solid var(--border);
 }
 .cal-week:last-child { border-bottom: none; }
@@ -438,15 +484,22 @@ body {
   cursor: pointer;
 }
 .cal-event:hover { filter: brightness(1.2); }
-.cal-event--wireless    { background: rgba(56,189,248,0.18); color: var(--wireless);    border-left: 3px solid var(--wireless); }
-.cal-event--electronics { background: rgba(251,146,60,0.18);  color: var(--electronics); border-left: 3px solid var(--electronics); }
-.cal-event--comms       { background: rgba(167,139,250,0.18); color: var(--comms);       border-left: 3px solid var(--comms); }
+.cal-event--wireless    { background: rgba(56,189,248,0.18); color: var(--wireless);    border-left: 3px solid var(--wireless);    border-right: 3px solid var(--wireless); }
+.cal-event--electronics { background: rgba(251,146,60,0.18);  color: var(--electronics); border-left: 3px solid var(--electronics); border-right: 3px solid var(--electronics); }
+.cal-event--comms       { background: rgba(167,139,250,0.18); color: var(--comms);       border-left: 3px solid var(--comms);       border-right: 3px solid var(--comms); }
+.cal-event--custom      { background: rgba(160,160,180,0.18); color: #aaa;               border-left: 3px solid #aaa;               border-right: 3px solid #aaa; }
 .cal-event--done        { opacity: 0.38; }
+
+/* 멀티위크 구간 테두리 처리 */
+.cal-event--first-seg { border-right: none !important; border-radius: 5px 0 0 5px; margin-right: 0; }
+.cal-event--mid-seg   { border-left: none !important; border-right: none !important; border-radius: 0; margin-left: 0; margin-right: 0; }
+.cal-event--last-seg  { border-left: none !important; border-radius: 0 5px 5px 0; margin-left: 0; }
 
 .cal-event__icon      { font-size: 0.95rem; flex-shrink: 0; }
 .cal-event__name      { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-event__count     { font-size: 0.73rem; opacity: 0.85; white-space: nowrap; }
 .cal-event__done-mark { color: var(--done); font-size: 0.85rem; flex-shrink: 0; }
+.cal-event__week      { margin-left: auto; font-size: 0.7rem; opacity: 0.6; white-space: nowrap; flex-shrink: 0; padding-left: 6px; }
 
 /* ── 범례 ── */
 .cal-legend       { display: flex; gap: 16px; flex-wrap: wrap; padding: 4px 0; }
@@ -524,6 +577,22 @@ body {
 .form-input:focus       { border-color: var(--primary); }
 .form-input::placeholder { color: var(--muted); }
 
+/* ── 기간 표시 ── */
+.period-display {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 9px 12px;
+  min-height: 39px;
+  display: flex;
+  align-items: center;
+  letter-spacing: 0.3px;
+}
+.period-display__placeholder { color: var(--muted); font-weight: 400; font-size: 0.82rem; }
+
 /* =============================================================
    8. 반응형
 ============================================================= */
@@ -536,8 +605,15 @@ body {
   .menu-btn       { justify-content: center; padding: 10px; }
   .summary        { grid-template-columns: repeat(2, 1fr); }
   .table-wrap     { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .schedule-table { min-width: 520px; }
+  .schedule-table { min-width: 540px; }
   .form-row       { grid-template-columns: 1fr; }
+
+  /* 주차 탭 */
+  .week-nav-btn { padding: 5px 9px; font-size: 0.68rem; }
+  .week-tab     { font-size: 0.78rem; padding: 5px 12px; }
+
+  /* 달력 주차 표시 크기 축소 */
+  .cal-event__week { font-size: 0.63rem; }
 }
 
 /* ── 모바일 (≤640px) ── */
@@ -572,19 +648,28 @@ body {
 
   /* 메인 */
   .main      { margin-left: 0; }
-  .container { padding: 16px 12px 72px; gap: 14px; }
+  .container { padding: 10px 10px 72px; gap: 8px; }
 
   /* 헤더 */
-  .header__title { font-size: 1.1rem; }
-  .btn--primary  { font-size: 0.8rem; padding: 7px 12px; }
+  .header__title { font-size: 0.95rem; }
+  .header__date  { display: none; }
+  .btn--primary  { font-size: 0.78rem; padding: 6px 10px; }
 
-  /* 요약 카드 */
-  .summary             { gap: 8px; }
-  .summary-card        { padding: 12px 8px; }
-  .summary-card__value { font-size: 1.4rem; }
+  /* 요약 카드: 4개 한 줄 */
+  .summary             { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .summary-card        { padding: 7px 4px; }
+  .summary-card__value { font-size: 1rem; }
+  .summary-card__label { font-size: 0.6rem; margin-top: 2px; }
 
-  /* 필터 / 탭 */
-  .subject-btn, .week-tab { font-size: 0.75rem; padding: 5px 10px; }
+  /* 진행바 */
+  .progress-bar { height: 5px; }
+
+  /* 필터: 한 줄 가로 스크롤 */
+  .subject-filter { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .subject-btn    { font-size: 0.72rem; padding: 4px 10px; white-space: nowrap; flex-shrink: 0; }
+
+  /* 주차 탭 */
+  .week-tab { font-size: 0.72rem; padding: 4px 10px; }
 
   /* 스케줄 테이블 → 카드 레이아웃 */
   .table-wrap     { overflow-x: unset; }
@@ -593,35 +678,51 @@ body {
   .schedule-table tbody { display: block; }
   .schedule-table tbody tr {
     display: grid;
-    grid-template-columns: 40px 1fr auto;
+    grid-template-columns: 34px 1fr auto;
     grid-template-areas:
       "check subject  status"
       "check name     buttons"
       "check deadline buttons";
-    gap: 3px 8px;
-    padding: 12px 12px 12px 4px;
+    gap: 2px 6px;
+    padding: 9px 10px 9px 2px;
     align-items: start;
   }
-  .schedule-table td           { display: block; padding: 0; border: none; font-size: 0.85rem; }
-  .schedule-table td:nth-child(1) { grid-area: check;    display: flex; align-items: center; justify-content: center; padding-top: 4px; }
+  .schedule-table td              { display: block; padding: 0; border: none; font-size: 0.82rem; }
+  .schedule-table td:nth-child(1) { grid-area: check;    display: flex; align-items: center; justify-content: center; padding-top: 2px; }
   .schedule-table td:nth-child(2) { grid-area: subject; }
-  .schedule-table td:nth-child(3) { grid-area: name;     font-size: 0.9rem; }
-  .schedule-table td:nth-child(4) { display: none; } /* 진도 숨김 */
-  .schedule-table td:nth-child(5) { display: none; } /* 소요시간 숨김 */
-  .schedule-table td:nth-child(6) { grid-area: deadline; font-size: 0.75rem; }
+  .schedule-table td:nth-child(3) { grid-area: name;     font-size: 0.86rem; }
+  .schedule-table td:nth-child(4) { display: none; }
+  .schedule-table td:nth-child(5) { display: none; }
+  .schedule-table td:nth-child(6) { grid-area: deadline; font-size: 0.72rem; }
   .schedule-table td:nth-child(7) { grid-area: status; }
-  .schedule-table td:nth-child(8) { grid-area: buttons;  display: flex; align-items: center; justify-content: flex-end; }
+  .schedule-table td:nth-child(8) { grid-area: buttons;  display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
   .col-name { max-width: none; }
 
+  /* 체크 버튼 */
+  .check-btn { width: 22px; height: 22px; font-size: 0.7rem; }
+
   /* 달력 */
-  .cal-week         { grid-template-rows: 26px 26px 26px 26px; }
-  .cal-days-header span { font-size: 0.65rem; padding: 6px 0; }
-  .cal-day          { padding: 3px 4px; }
-  .cal-day__num     { width: 18px; height: 18px; font-size: 0.68rem; }
-  .cal-nav__label   { font-size: 0.9rem; min-width: 120px; }
-  .cal-event        { padding: 3px 6px; font-size: 0.68rem; gap: 4px; margin: 2px; }
-  .cal-event__count { display: none; }
-  .cal-event__icon  { font-size: 0.75rem; }
+  .cal-week              { grid-template-rows: 24px 20px 20px 20px 20px; }
+  .cal-days-header span  { font-size: 0.65rem; padding: 6px 0; }
+  .cal-day               { padding: 3px 4px; }
+  .cal-day__num          { width: 18px; height: 18px; font-size: 0.68rem; }
+  .cal-nav__label        { font-size: 0.9rem; min-width: 120px; }
+  .cal-event             { padding: 2px 5px; font-size: 0.63rem; gap: 3px; margin: 1px 2px; }
+  .cal-event__count      { display: none; }
+  .cal-event__week       { display: none; }
+  .cal-event__icon       { font-size: 0.7rem; }
+  .cal-event__done-mark  { display: none; }
+
+  /* 미루기 버튼 터치 영역 */
+  .btn--delay { font-size: 0.9rem; padding: 6px 8px; }
+  .btn--delay:active { opacity: 0.6; }
+
+  /* 액션 버튼 3개 간격 */
+  .schedule-table td:nth-child(8) { gap: 2px; }
+
+  /* 색상 스와치 터치 타겟 */
+  .color-swatch { width: 34px; height: 34px; }
+  .color-swatches { gap: 10px; }
 
   /* 모달 → 하단 시트 */
   .modal-overlay { padding: 0; align-items: flex-end; }
