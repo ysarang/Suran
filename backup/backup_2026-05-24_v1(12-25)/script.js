@@ -665,10 +665,10 @@ async function renderAdminUsers() {
       <td style="color:var(--done)">${done}</td>
       <td>${rate}%</td>
       <td>
-        ${!profile.is_admin ? `<button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px"
+        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px"
           data-view-user="${profile.id}" data-view-email="${esc(profile.email||'')}">
           스케줄 보기
-        </button>` : ''}
+        </button>
       </td>
     </tr>`;
   }).join('');
@@ -690,13 +690,6 @@ async function renderAdminUsers() {
   });
 }
 
-function setAdminSidebarMode(viewingUser) {
-  const scheduleItem = document.querySelector('[data-view="schedule"]').closest('li');
-  const calendarItem = document.querySelector('[data-view="calendar"]').closest('li');
-  scheduleItem.style.display = viewingUser ? '' : 'none';
-  calendarItem.style.display = viewingUser ? '' : 'none';
-}
-
 function showAdminBanner(email) {
   let banner = $('admin-viewing-banner');
   if (!banner) {
@@ -706,16 +699,14 @@ function showAdminBanner(email) {
     const container = document.querySelector('#view-schedule .container');
     container.insertBefore(banner, container.firstChild);
   }
-  setAdminSidebarMode(true);
   banner.innerHTML = `
     <span>👑 <strong>${esc(email)}</strong>님의 스케줄 보는 중</span>
     <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px" id="admin-back-btn">← 목록으로</button>
   `;
-  $('admin-back-btn').addEventListener('click', () => {
+  $('admin-back-btn').addEventListener('click', async () => {
     viewingUserId = null;
-    courses = [];
+    await loadCourses(currentUser.id);
     banner.remove();
-    setAdminSidebarMode(false);
     switchView('admin');
   });
 }
@@ -901,28 +892,19 @@ async function onLogin(user) {
 
   try {
     // 프로필 조회 (admin 여부 확인)
-    console.log('[profile] 조회 시작, uid:', user.id);
-    const { data: profile, error: profileError } = await Promise.race([
+    const { data: profile } = await Promise.race([
       sb.from('profiles').select('is_admin, email').eq('id', user.id).maybeSingle(),
-      new Promise(res => setTimeout(() => res({ data: null, error: new Error('profile 타임아웃') }), 6000)),
+      new Promise(res => setTimeout(() => res({ data: null }), 6000)),
     ]);
-    console.log('[profile] 결과:', { profile, error: profileError?.message });
 
     isAdmin = profile?.is_admin ?? false;
     if (profile?.email) $('sidebar-email').textContent = profile.email;
     $('admin-menu-item').style.display = isAdmin ? '' : 'none';
-    console.log('[profile] isAdmin:', isAdmin);
 
-    if (isAdmin) {
-      // 어드민은 자기 스케줄 불필요 → 관리자 뷰로 바로 이동
-      courses = [];
-      setAdminSidebarMode(false);
-      switchView('admin');
-    } else {
-      await loadCourses(user.id);
-      activeWeek = detectWeekFromDate(todayStr);
-      renderSchedule();
-    }
+    // 코스 로딩
+    await loadCourses(user.id);
+    activeWeek = detectWeekFromDate(todayStr);
+    renderSchedule();
   } catch (err) {
     console.error('[onLogin] 오류:', err);
   } finally {
@@ -936,16 +918,9 @@ function init() {
   sb.auth.onAuthStateChange(async (event, session) => {
     console.log('[auth event]', event);
 
-    if (event === 'INITIAL_SESSION') {
-      // 세션 준비 완료 후 → 데이터 로딩
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
       if (session?.user) await onLogin(session.user);
       else showAuthScreen();
-    } else if (event === 'SIGNED_IN') {
-      // 로그인 직후 → 화면만 즉시 전환 (쿼리 X, INITIAL_SESSION에서 처리)
-      if (session?.user && !loggingIn) {
-        hideAuthScreen();
-        $('sidebar-email').textContent = session.user.email || '';
-      }
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       isAdmin     = false;
@@ -953,6 +928,7 @@ function init() {
       loggingIn   = false;
       showAuthScreen();
     }
+    // TOKEN_REFRESHED 등 기타 이벤트는 무시
   });
 }
 
