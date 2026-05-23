@@ -631,6 +631,13 @@ body {
   padding: 7px 12px;
   width: 100%;
 }
+.sidebar__version {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--muted);
+  padding: 10px 0 14px;
+  opacity: 0.5;
+}
 
 /* =============================================================
    9. 인증 화면
