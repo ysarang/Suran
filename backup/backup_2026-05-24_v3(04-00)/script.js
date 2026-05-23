@@ -347,40 +347,6 @@ async function deleteDailyNote(date) {
 }
 
 /* =============================================================
-   5-c. 버그 리포트 데이터 (Supabase)
-============================================================= */
-async function submitBugReport(type, message) {
-  const { error } = await sb.from('bug_reports').insert({
-    user_id:    currentUser.id,
-    user_email: currentUser.email,
-    type,
-    message,
-  });
-  return error;
-}
-
-async function loadBugReports() {
-  const { data, error } = await sb.rpc('get_all_bug_reports');
-  if (error) { console.error('loadBugReports:', error); return []; }
-  return data || [];
-}
-
-async function markBugReportRead(id) {
-  const { error } = await sb.rpc('mark_bug_report_read', { report_id: id });
-  if (error) console.error('markBugReportRead:', error);
-}
-
-async function refreshBugBadge() {
-  if (!isAdmin) return;
-  const { data } = await sb.from('bug_reports').select('id').eq('is_read', false);
-  const count = data?.length ?? 0;
-  const badge = $('bug-unread-badge');
-  if (!badge) return;
-  if (count > 0) { badge.style.display = ''; badge.textContent = count; }
-  else           { badge.style.display = 'none'; }
-}
-
-/* =============================================================
    6. UI 헬퍼
 ============================================================= */
 function periodLabel(startDate, endDate) {
@@ -1018,9 +984,9 @@ async function renderAdminUsers() {
     return `<tr>
       <td>${esc(profile.email || '-')}${isMe ? ' <span class="badge badge--default" style="font-size:0.7rem">나</span>' : ''}${profile.is_admin ? ' <span class="badge badge--done" style="font-size:0.7rem">admin</span>' : ''}</td>
       <td style="color:var(--muted)">${joinDate}</td>
-      <td>${profile.is_admin ? '<span style="color:var(--muted)">-</span>' : total}</td>
-      <td style="color:var(--done)">${profile.is_admin ? '<span style="color:var(--muted)">-</span>' : done}</td>
-      <td>${profile.is_admin ? '<span style="color:var(--muted)">-</span>' : rate + '%'}</td>
+      <td>${total}</td>
+      <td style="color:var(--done)">${done}</td>
+      <td>${rate}%</td>
       <td>
         ${!profile.is_admin ? `<button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px"
           data-view-user="${profile.id}" data-view-email="${esc(profile.email||'')}">
@@ -1074,91 +1040,6 @@ function showAdminBanner(email) {
     banner.remove();
     setAdminSidebarMode(false);
     switchView('admin');
-  });
-}
-
-/* =============================================================
-   12-b. 버그 리포트 UI
-============================================================= */
-function openBugReportModal() {
-  $('bug-report-form').reset();
-  $('bug-char-count').textContent = '0 / 500';
-  $('bug-submit-msg').textContent = '';
-  $('bug-submit-msg').className   = 'bug-submit-msg';
-  $('bug-report-overlay').classList.add('open');
-  setTimeout(() => $('bug-message').focus(), 50);
-}
-
-function closeBugReportModal() {
-  $('bug-report-overlay').classList.remove('open');
-}
-
-async function handleBugReportSubmit(e) {
-  e.preventDefault();
-  const type    = $('bug-type').value;
-  const message = $('bug-message').value.trim();
-  if (!message) { $('bug-message').focus(); return; }
-
-  const submitBtn = $('bug-report-submit-btn');
-  const msgEl     = $('bug-submit-msg');
-  submitBtn.disabled    = true;
-  submitBtn.textContent = '전송 중...';
-  msgEl.textContent = '';
-
-  const error = await submitBugReport(type, message);
-  submitBtn.disabled    = false;
-  submitBtn.textContent = '전송';
-
-  if (error) {
-    msgEl.className   = 'bug-submit-msg bug-submit-msg--error';
-    msgEl.textContent = '다시보내주세용😭';
-  } else {
-    msgEl.className   = 'bug-submit-msg bug-submit-msg--success';
-    msgEl.textContent = '알라뷰❤️';
-    setTimeout(closeBugReportModal, 1400);
-  }
-}
-
-async function loadAndRenderBugReports() {
-  const list = $('bug-report-admin-list');
-  list.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">불러오는 중...</p>';
-
-  const reports = await loadBugReports();
-
-  const unread = reports.filter(r => !r.is_read).length;
-  const badge  = $('bug-unread-badge');
-  if (unread > 0) { badge.style.display = ''; badge.textContent = unread; }
-  else            { badge.style.display = 'none'; }
-
-  if (!reports.length) {
-    list.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">버그 리포트가 없습니다.</p>';
-    return;
-  }
-
-  const typeLabel = { bug: '🐛 버그', suggestion: '💡 건의', other: '💬 기타' };
-  const typeCls   = { bug: 'bug', suggestion: 'suggestion', other: 'other' };
-
-  list.innerHTML = reports.map(r => {
-    const date = new Date(r.created_at).toLocaleString('ko-KR',
-      { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    return `<div class="bug-admin-item${r.is_read ? '' : ' bug-admin-item--unread'}" data-id="${r.id}">
-      <div class="bug-admin-item__meta">
-        <span class="bug-admin-item__type bug-admin-item__type--${typeCls[r.type] || 'other'}">${typeLabel[r.type] || '기타'}</span>
-        <span class="bug-admin-item__email">${esc(r.user_email || '알 수 없음')}</span>
-        <span class="bug-admin-item__date">${date}</span>
-      </div>
-      <p class="bug-admin-item__message">${esc(r.message)}</p>
-      ${!r.is_read ? `<div class="bug-admin-item__actions">
-        <button class="btn btn--ghost bug-admin-item__read-btn" data-read="${r.id}">읽음 처리</button>
-      </div>` : ''}
-    </div>`;
-  }).join('');
-
-  list.querySelectorAll('[data-read]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      await markBugReportRead(btn.dataset.read);
-      loadAndRenderBugReports();
-    });
   });
 }
 
@@ -1321,30 +1202,6 @@ function bindEvents() {
   });
   $('course-form').addEventListener('submit', handleFormSubmit);
 
-  // 버그 리포트 플로팅 버튼
-  $('bug-fab').addEventListener('click', openBugReportModal);
-  $('bug-report-close-btn').addEventListener('click', closeBugReportModal);
-  $('bug-report-cancel-btn').addEventListener('click', closeBugReportModal);
-  $('bug-report-overlay').addEventListener('click', e => {
-    if (e.target === $('bug-report-overlay')) closeBugReportModal();
-  });
-  $('bug-report-form').addEventListener('submit', handleBugReportSubmit);
-  $('bug-message').addEventListener('input', () => {
-    $('bug-char-count').textContent = `${$('bug-message').value.length} / 500`;
-  });
-
-  // 관리자 탭 전환
-  document.querySelectorAll('.admin-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('admin-tab--active'));
-      tab.classList.add('admin-tab--active');
-      const which = tab.dataset.adminTab;
-      $('admin-tab-users').style.display = which === 'users' ? '' : 'none';
-      $('admin-tab-bugs').style.display  = which === 'bugs'  ? '' : 'none';
-      if (which === 'bugs') loadAndRenderBugReports();
-    });
-  });
-
   // 로그아웃
   $('logout-btn').addEventListener('click', () => {
     console.log('[logout] 클릭');
@@ -1415,7 +1272,6 @@ async function onLogin(user) {
       courses = [];
       setAdminSidebarMode(false);
       switchView('admin');
-      refreshBugBadge();
     } else {
       await loadCourses(user.id);
       activeWeek = detectWeekFromDate(todayStr);
