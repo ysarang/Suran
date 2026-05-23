@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -17,13 +17,13 @@
       <li>
         <button class="menu-btn menu-btn--active" data-view="schedule">
           <span class="menu-icon">📋</span>
-          <span class="menu-label">공부 스케줄</span>
+          <span class="menu-label">강의 스케줄</span>
         </button>
       </li>
       <li>
         <button class="menu-btn" data-view="calendar">
           <span class="menu-icon">📅</span>
-          <span class="menu-label">공부 달력</span>
+          <span class="menu-label">강의 달력</span>
         </button>
       </li>
     </ul>
@@ -32,16 +32,16 @@
   <!-- ===================== 메인 ===================== -->
   <main class="main">
 
-    <!-- ── 공부 스케줄 뷰 ── -->
+    <!-- ── 강의 스케줄 뷰 ── -->
     <div id="view-schedule" class="view view--active">
       <div class="container">
 
         <header class="header">
           <div>
-            <h1 class="header__title">📋 공부 스케줄</h1>
+            <h1 class="header__title">📋 강의 스케줄</h1>
             <p class="header__date" id="today-date"></p>
           </div>
-          <button class="btn btn--primary" id="open-modal-btn">+ 공부 추가</button>
+          <button class="btn btn--primary" id="open-modal-btn">+ 강의 추가</button>
         </header>
 
         <!-- 요약 카드 -->
@@ -80,11 +80,7 @@
         </div>
 
         <!-- 주차 탭 -->
-        <div class="week-tabs-wrap">
-          <button class="week-nav-btn" id="week-prev">◀</button>
-          <nav class="week-tabs" id="week-tabs"></nav>
-          <button class="week-nav-btn" id="week-next">▶</button>
-        </div>
+        <nav class="week-tabs" id="week-tabs"></nav>
 
         <!-- 강의 테이블 -->
         <section class="table-wrap">
@@ -96,7 +92,7 @@
                 <th>강의명</th>
                 <th>진도</th>
                 <th>소요시간</th>
-                <th>기간</th>
+                <th>마감일</th>
                 <th>상태</th>
                 <th></th>
               </tr>
@@ -105,7 +101,7 @@
           </table>
           <div class="empty-state" id="empty-state">
             <p class="empty-state__icon">📂</p>
-            <p class="empty-state__text">이 주차에 등록된 강의가 없습니다.</p>
+            <p class="empty-state__text">이 주차에 등록된 공부가 없습니다.</p>
           </div>
         </section>
 
@@ -157,7 +153,7 @@
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <div class="modal__header">
-      <h2 class="modal__title" id="modal-title">공부 추가</h2>
+      <h2 class="modal__title" id="modal-title">강의 추가</h2>
       <button class="modal__close" id="close-modal-btn">✕</button>
     </div>
     <form class="modal__form" id="course-form" autocomplete="off">
@@ -174,17 +170,8 @@
             <option value="wireless">📡 무선공학</option>
             <option value="electronics">⚡ 전자공학</option>
             <option value="comms">📶 통신공학</option>
-            <option value="custom">✏️ 직접 입력</option>
           </select>
         </div>
-      </div>
-
-      <div class="form-group" id="custom-subject-group" style="display:none">
-        <label class="form-label">과목명 직접 입력</label>
-        <input type="text" class="form-input" id="f-custom-subject" placeholder="과목명을 입력하세요" maxlength="30">
-        <label class="form-label" style="margin-top:10px">색상</label>
-        <div class="color-swatches" id="color-swatches"></div>
-        <input type="hidden" id="f-custom-color">
       </div>
 
       <div class="form-row">
@@ -213,15 +200,9 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">시작일</label>
-          <input type="date" class="form-input" id="f-start-date">
-        </div>
-        <div class="form-group">
-          <label class="form-label">종료일</label>
-          <input type="date" class="form-input" id="f-end-date">
-        </div>
+      <div class="form-group">
+        <label class="form-label">마감일</label>
+        <input type="date" class="form-input" id="f-deadline">
       </div>
 
       <div class="modal__actions">

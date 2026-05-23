@@ -436,7 +436,7 @@ body {
 .cal-week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: 36px 36px 36px 36px;
+  grid-template-rows: 36px 36px 36px 36px 36px;
   border-bottom: 1px solid var(--border);
 }
 .cal-week:last-child { border-bottom: none; }
@@ -605,8 +605,15 @@ body {
   .menu-btn       { justify-content: center; padding: 10px; }
   .summary        { grid-template-columns: repeat(2, 1fr); }
   .table-wrap     { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .schedule-table { min-width: 520px; }
+  .schedule-table { min-width: 540px; }
   .form-row       { grid-template-columns: 1fr; }
+
+  /* 주차 탭 */
+  .week-nav-btn { padding: 5px 9px; font-size: 0.68rem; }
+  .week-tab     { font-size: 0.78rem; padding: 5px 12px; }
+
+  /* 달력 주차 표시 크기 축소 */
+  .cal-event__week { font-size: 0.63rem; }
 }
 
 /* ── 모바일 (≤640px) ── */
@@ -641,19 +648,28 @@ body {
 
   /* 메인 */
   .main      { margin-left: 0; }
-  .container { padding: 16px 12px 72px; gap: 14px; }
+  .container { padding: 10px 10px 72px; gap: 8px; }
 
   /* 헤더 */
-  .header__title { font-size: 1.1rem; }
-  .btn--primary  { font-size: 0.8rem; padding: 7px 12px; }
+  .header__title { font-size: 0.95rem; }
+  .header__date  { display: none; }
+  .btn--primary  { font-size: 0.78rem; padding: 6px 10px; }
 
-  /* 요약 카드 */
-  .summary             { gap: 8px; }
-  .summary-card        { padding: 12px 8px; }
-  .summary-card__value { font-size: 1.4rem; }
+  /* 요약 카드: 4개 한 줄 */
+  .summary             { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .summary-card        { padding: 7px 4px; }
+  .summary-card__value { font-size: 1rem; }
+  .summary-card__label { font-size: 0.6rem; margin-top: 2px; }
 
-  /* 필터 / 탭 */
-  .subject-btn, .week-tab { font-size: 0.75rem; padding: 5px 10px; }
+  /* 진행바 */
+  .progress-bar { height: 5px; }
+
+  /* 필터: 한 줄 가로 스크롤 */
+  .subject-filter { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .subject-btn    { font-size: 0.72rem; padding: 4px 10px; white-space: nowrap; flex-shrink: 0; }
+
+  /* 주차 탭 */
+  .week-tab { font-size: 0.72rem; padding: 4px 10px; }
 
   /* 스케줄 테이블 → 카드 레이아웃 */
   .table-wrap     { overflow-x: unset; }
@@ -662,35 +678,51 @@ body {
   .schedule-table tbody { display: block; }
   .schedule-table tbody tr {
     display: grid;
-    grid-template-columns: 40px 1fr auto;
+    grid-template-columns: 34px 1fr auto;
     grid-template-areas:
       "check subject  status"
       "check name     buttons"
       "check deadline buttons";
-    gap: 3px 8px;
-    padding: 12px 12px 12px 4px;
+    gap: 2px 6px;
+    padding: 9px 10px 9px 2px;
     align-items: start;
   }
-  .schedule-table td           { display: block; padding: 0; border: none; font-size: 0.85rem; }
-  .schedule-table td:nth-child(1) { grid-area: check;    display: flex; align-items: center; justify-content: center; padding-top: 4px; }
+  .schedule-table td              { display: block; padding: 0; border: none; font-size: 0.82rem; }
+  .schedule-table td:nth-child(1) { grid-area: check;    display: flex; align-items: center; justify-content: center; padding-top: 2px; }
   .schedule-table td:nth-child(2) { grid-area: subject; }
-  .schedule-table td:nth-child(3) { grid-area: name;     font-size: 0.9rem; }
-  .schedule-table td:nth-child(4) { display: none; } /* 진도 숨김 */
-  .schedule-table td:nth-child(5) { display: none; } /* 소요시간 숨김 */
-  .schedule-table td:nth-child(6) { grid-area: deadline; font-size: 0.75rem; }
+  .schedule-table td:nth-child(3) { grid-area: name;     font-size: 0.86rem; }
+  .schedule-table td:nth-child(4) { display: none; }
+  .schedule-table td:nth-child(5) { display: none; }
+  .schedule-table td:nth-child(6) { grid-area: deadline; font-size: 0.72rem; }
   .schedule-table td:nth-child(7) { grid-area: status; }
-  .schedule-table td:nth-child(8) { grid-area: buttons;  display: flex; align-items: center; justify-content: flex-end; }
+  .schedule-table td:nth-child(8) { grid-area: buttons;  display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
   .col-name { max-width: none; }
 
+  /* 체크 버튼 */
+  .check-btn { width: 22px; height: 22px; font-size: 0.7rem; }
+
   /* 달력 */
-  .cal-week         { grid-template-rows: 26px 26px 26px 26px; }
-  .cal-days-header span { font-size: 0.65rem; padding: 6px 0; }
-  .cal-day          { padding: 3px 4px; }
-  .cal-day__num     { width: 18px; height: 18px; font-size: 0.68rem; }
-  .cal-nav__label   { font-size: 0.9rem; min-width: 120px; }
-  .cal-event        { padding: 3px 6px; font-size: 0.68rem; gap: 4px; margin: 2px; }
-  .cal-event__count { display: none; }
-  .cal-event__icon  { font-size: 0.75rem; }
+  .cal-week              { grid-template-rows: 24px 20px 20px 20px 20px; }
+  .cal-days-header span  { font-size: 0.65rem; padding: 6px 0; }
+  .cal-day               { padding: 3px 4px; }
+  .cal-day__num          { width: 18px; height: 18px; font-size: 0.68rem; }
+  .cal-nav__label        { font-size: 0.9rem; min-width: 120px; }
+  .cal-event             { padding: 2px 5px; font-size: 0.63rem; gap: 3px; margin: 1px 2px; }
+  .cal-event__count      { display: none; }
+  .cal-event__week       { display: none; }
+  .cal-event__icon       { font-size: 0.7rem; }
+  .cal-event__done-mark  { display: none; }
+
+  /* 미루기 버튼 터치 영역 */
+  .btn--delay { font-size: 0.9rem; padding: 6px 8px; }
+  .btn--delay:active { opacity: 0.6; }
+
+  /* 액션 버튼 3개 간격 */
+  .schedule-table td:nth-child(8) { gap: 2px; }
+
+  /* 색상 스와치 터치 타겟 */
+  .color-swatch { width: 34px; height: 34px; }
+  .color-swatches { gap: 10px; }
 
   /* 모달 → 하단 시트 */
   .modal-overlay { padding: 0; align-items: flex-end; }
