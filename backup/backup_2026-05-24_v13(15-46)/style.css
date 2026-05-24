@@ -854,34 +854,27 @@ body {
 .sidebar__user {
   padding: 10px 12px 0;
   border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 .sidebar__user-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  width: 100%;
 }
 .sidebar__user-email {
   font-size: 0.72rem;
   color: var(--muted);
-  text-align: center;
-  order: -1;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  width: 100%;
 }
 .sidebar__logout {
-  font-size: 0.9rem;
-  padding: 8px 0;
-  width: 100%;
-  text-align: center;
+  font-size: 0.78rem;
+  padding: 5px 8px;
+  flex-shrink: 0;
   line-height: 1;
-  order: 0;
 }
 .logout-icon { display: none; }
 .logout-text { display: inline; }
@@ -1101,12 +1094,10 @@ body {
   }
   .sidebar__brand          { display: none; }
   .sidebar__divider        { display: none; }
-  .sidebar__menu--settings { display: contents; }
+  .sidebar__menu--settings { display: flex; padding: 0; flex-shrink: 0; }
   .sidebar__user           { display: none; }
   .sidebar__version        { display: none; }
-  .sidebar__menu  { display: contents; }
-  .sidebar__menu li,
-  .sidebar__menu--settings li { flex: 1; display: flex; }
+  .sidebar__menu  { flex-direction: row; flex: 1; padding: 0; gap: 0; }
   .mob-only       { display: flex; }
 
   /* 탭 버튼 공통 */
@@ -1231,27 +1222,6 @@ body {
   .schedule-table td:nth-child(7) { grid-area: status;   display: flex; justify-content: flex-end; }
   .schedule-table td:nth-child(8) { grid-area: buttons;  display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
   .col-name { max-width: none; }
-
-  /* 관리자 유저 테이블 → 한 줄 리스트 (스케줄 테이블 그리드 덮어쓰기) */
-  #admin-user-table tbody tr {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-  }
-  #admin-user-table td {
-    display: block;
-    padding: 0;
-    border: none;
-    font-size: 0.88rem;
-  }
-  #admin-user-table td:nth-child(1) { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #admin-user-table td:nth-child(2) { font-size: 0.74rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-  #admin-user-table td:nth-child(3),
-  #admin-user-table td:nth-child(4),
-  #admin-user-table td:nth-child(5) { display: none; }
-  #admin-user-table td:nth-child(6) { flex-shrink: 0; }
 
   /* 체크 버튼 */
   .check-btn { width: 30px; height: 30px; }

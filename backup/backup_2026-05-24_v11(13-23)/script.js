@@ -42,12 +42,10 @@ function runTypewriter(el, text, speed = 110) {
 }
 
 function initTypewriter() {
-  const sidebar  = document.querySelector('.sidebar__brand');
-  const auth     = document.querySelector('.auth-brand');
-  const mobTitle = document.querySelector('.mob-topbar');
-  if (sidebar)  runTypewriter(sidebar,  '👊\n아무튼\n딴짓하면\n꿀밤!');
-  if (auth)     runTypewriter(auth,     '👊\n아무튼 딴짓하면 꿀밤!');
-  if (mobTitle) runTypewriter(mobTitle, '👊 아무튼 딴짓하면 꿀밤!', 80);
+  const sidebar = document.querySelector('.sidebar__brand');
+  const auth    = document.querySelector('.auth-brand');
+  if (sidebar) runTypewriter(sidebar, '👊\n아무튼\n딴짓하면\n꿀밤!');
+  if (auth)    runTypewriter(auth,    '👊\n아무튼 딴짓하면 꿀밤!');
 }
 
 /* ── 숫자 카운트업 ── */
@@ -88,13 +86,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 ============================================================= */
 const WEEKS = Array.from({ length: 24 }, (_, i) => i + 1);
 let userWeekStart = new Date('2026-05-11'); // 로그인 후 프로필에서 덮어씀
-
-// 표시할 주차 범위 (localStorage 에서 복원)
-let visibleWeekRange = (() => {
-  try { return JSON.parse(localStorage.getItem('weekRange')) || { from: 1, to: 12 }; }
-  catch { return { from: 1, to: 12 }; }
-})();
-function saveWeekRange() { localStorage.setItem('weekRange', JSON.stringify(visibleWeekRange)); }
 
 const SUBJECTS = {
   wireless:    { label: '📡 무선공학', cls: 'wireless' },
@@ -455,30 +446,10 @@ function updateSummary() {
   $('overall-bar').style.width = rate + '%';
 }
 
-function renderWeekTabs(scrollHint = 'active') {
-  // scrollHint: 'active' | 'end' | 'start'
+function renderWeekTabs() {
   const nav = $('week-tabs');
   nav.innerHTML = '';
-
-  const from = Math.max(1, visibleWeekRange.from);
-  const to   = Math.min(24, visibleWeekRange.to);
-
-  // - 버튼: 항상 표시, 맨 왼쪽 주차를 제거
-  const subBtn = document.createElement('button');
-  subBtn.className = 'week-add-btn';
-  subBtn.title = `${from}주차 숨기기`;
-  subBtn.textContent = '−';
-  subBtn.disabled = from >= to;
-  subBtn.addEventListener('click', () => {
-    if (visibleWeekRange.from >= visibleWeekRange.to) return;
-    visibleWeekRange.from = visibleWeekRange.from + 1;
-    if (activeWeek < visibleWeekRange.from) { activeWeek = visibleWeekRange.from; }
-    saveWeekRange();
-    renderWeekTabs('start');
-  });
-  nav.appendChild(subBtn);
-
-  WEEKS.filter(w => w >= from && w <= to).forEach(week => {
+  WEEKS.forEach(week => {
     const count = courses.filter(c =>
       c.week === week && (activeSubject === 'all' || c.subject === activeSubject)
     ).length;
@@ -488,31 +459,8 @@ function renderWeekTabs(scrollHint = 'active') {
     btn.addEventListener('click', () => { activeWeek = week; renderSchedule(); });
     nav.appendChild(btn);
   });
-
-  // + 버튼: 끝 주차가 24 미만일 때 표시
-  if (to < 24) {
-    const addBtn = document.createElement('button');
-    addBtn.className = 'week-add-btn';
-    addBtn.title = `${to + 1}주차 표시`;
-    addBtn.textContent = '+';
-    addBtn.addEventListener('click', () => {
-      visibleWeekRange.to = Math.min(24, visibleWeekRange.to + 1);
-      saveWeekRange();
-      renderWeekTabs('end');
-    });
-    nav.appendChild(addBtn);
-  }
-
-  if (scrollHint === 'end') {
-    const last = nav.lastElementChild;
-    if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
-  } else if (scrollHint === 'start') {
-    const first = nav.firstElementChild;
-    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-  } else {
-    const activeTab = nav.querySelector('.week-tab.active');
-    if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
+  const activeTab = nav.querySelector('.week-tab.active');
+  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 function renderTableRows() {
@@ -969,7 +917,7 @@ function openModal(editId = null) {
     $('f-start-date').value = course.startDate || '';
     $('f-end-date').value   = course.endDate   || '';
   } else {
-    $('modal-title').textContent = '추가';
+    $('modal-title').textContent = '공부 추가';
     $('course-form').reset();
     $('edit-id').value  = '';
     $('f-week').value   = activeWeek;
@@ -1188,195 +1136,6 @@ async function handleBugReportSubmit(e) {
     msgEl.textContent = '알라뷰❤️';
     setTimeout(closeBugReportModal, 1400);
   }
-}
-
-/* =============================================================
-   공지 관리
-============================================================= */
-function showNoticePreview(content, dateLabel = '') {
-  const lines     = (content || '').split('\n');
-  const titleText = lines[0].trim();
-  const bodyText  = lines.slice(1).join('\n').replace(/^\n+/, '');
-  $('notice-popup-badge').textContent = '📢 미리보기';
-  $('notice-popup-title').textContent = titleText;
-  $('notice-popup-date').textContent  = dateLabel || '미리보기';
-  $('notice-popup-body').textContent  = bodyText;
-  $('notice-popup-overlay').classList.add('open');
-  $('notice-confirm-btn').onclick = () => $('notice-popup-overlay').classList.remove('open');
-  const dismissBtn = $('notice-dismiss-btn');
-  dismissBtn.textContent = '닫기';
-  dismissBtn.onclick = () => $('notice-popup-overlay').classList.remove('open');
-}
-
-async function renderAdminNotices() {
-  const listEl = $('notice-admin-list');
-  listEl.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">불러오는 중...</p>';
-
-  const { data, error } = await sb
-    .from('announcements')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) { listEl.innerHTML = '<p style="color:var(--delayed);padding:20px">불러오기 실패</p>'; return; }
-  if (!data?.length) { listEl.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">등록된 공지가 없어요.</p>'; return; }
-
-  const now = todayStr;
-  listEl.innerHTML = `<div class="notice-list-wrap">${data.map(n => {
-    const expired = n.end_date < now;
-    const created = new Date(n.created_at).toLocaleDateString('ko-KR');
-    const updated = n.updated_at !== n.created_at
-      ? ` · 수정 ${new Date(n.updated_at).toLocaleDateString('ko-KR')}` : '';
-    return `<div class="notice-admin-item${expired ? ' notice-admin-item--expired' : ''}" data-nid="${n.id}">
-      <div class="notice-admin-item__meta">
-        <span>${n.start_date} ~ ${n.end_date}</span>
-        <span>작성 ${created}${updated}</span>
-        ${expired ? '<span style="color:var(--delayed)">기간 종료</span>' : (n.is_active ? '<span style="color:var(--done)">활성</span>' : '<span style="color:var(--muted)">비활성</span>')}
-      </div>
-      <div class="notice-admin-item__content">${esc(n.content)}</div>
-      <div class="notice-admin-item__actions">
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px" data-preview-notice="${n.id}">미리보기</button>
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px" data-append-notice="${n.id}">내용 수정</button>
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px;color:${n.is_active ? 'var(--muted)' : 'var(--done)'}" data-toggle-notice="${n.id}" data-active="${n.is_active}">${n.is_active ? '비활성화' : '활성화'}</button>
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px;color:var(--delayed)" data-delete-notice="${n.id}">삭제</button>
-      </div>
-      <div class="notice-admin-item__append" id="notice-append-${n.id}" style="display:none;flex-direction:column;gap:8px">
-        <textarea class="form-input" rows="4" id="notice-append-input-${n.id}"></textarea>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="date" class="form-input" id="notice-edit-start-${n.id}" style="flex:1">
-          <span style="color:var(--muted);font-size:0.85rem">~</span>
-          <input type="date" class="form-input" id="notice-edit-end-${n.id}" style="flex:1">
-          <button class="btn btn--primary" style="font-size:0.8rem;padding:5px 14px;white-space:nowrap" data-save-append="${n.id}">저장</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('')}</div>`;
-
-  // 미리보기
-  listEl.querySelectorAll('[data-preview-notice]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const nid    = btn.dataset.previewNotice;
-      const notice = data.find(n => n.id === nid);
-      if (!notice) return;
-      showNoticePreview(notice.content, `${notice.start_date} ~ ${notice.end_date}`);
-    });
-  });
-
-  // 내용 수정 토글
-  listEl.querySelectorAll('[data-append-notice]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const nid      = btn.dataset.appendNotice;
-      const row      = $(`notice-append-${nid}`);
-      const textarea = $(`notice-append-input-${nid}`);
-      const isHidden = row.style.display === 'none';
-      if (isHidden) {
-        const original = data.find(n => n.id === nid);
-        if (original) {
-          textarea.value = original.content;
-          const startEl = $(`notice-edit-start-${nid}`);
-          const endEl   = $(`notice-edit-end-${nid}`);
-          if (startEl) startEl.value = original.start_date;
-          if (endEl)   endEl.value   = original.end_date;
-        }
-      }
-      row.style.display = isHidden ? 'flex' : 'none';
-    });
-  });
-
-  // 수정 저장
-  listEl.querySelectorAll('[data-save-append]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const nid        = btn.dataset.saveAppend;
-      const newContent = $(`notice-append-input-${nid}`)?.value.trim();
-      const newStart   = $(`notice-edit-start-${nid}`)?.value;
-      const newEnd     = $(`notice-edit-end-${nid}`)?.value;
-      if (!newContent) return;
-      const updates = { content: newContent, updated_at: new Date().toISOString() };
-      if (newStart) updates.start_date = newStart;
-      if (newEnd)   updates.end_date   = newEnd;
-      const { error } = await sb.from('announcements')
-        .update(updates)
-        .eq('id', nid);
-      if (!error) renderAdminNotices();
-    });
-  });
-
-  // 활성/비활성 토글
-  listEl.querySelectorAll('[data-toggle-notice]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const nid    = btn.dataset.toggleNotice;
-      const active = btn.dataset.active === 'true';
-      await sb.from('announcements').update({ is_active: !active }).eq('id', nid);
-      renderAdminNotices();
-    });
-  });
-
-  // 삭제
-  listEl.querySelectorAll('[data-delete-notice]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('공지를 삭제할까요?')) return;
-      const nid = btn.dataset.deleteNotice;
-      await sb.from('announcements').delete().eq('id', nid);
-      renderAdminNotices();
-    });
-  });
-}
-
-async function submitNotice() {
-  const content = $('notice-content').value.trim();
-  const start   = $('notice-start').value;
-  const end     = $('notice-end').value;
-  const msg     = $('notice-write-msg');
-  if (!content || !start || !end) { msg.style.color='var(--delayed)'; msg.textContent='내용과 기간을 모두 입력해주세요.'; return; }
-  if (start > end) { msg.style.color='var(--delayed)'; msg.textContent='종료일이 시작일보다 빠릅니다.'; return; }
-  const btn = $('notice-submit-btn');
-  btn.disabled = true; btn.textContent = '등록 중...';
-  const { error } = await sb.from('announcements').insert({ content, start_date: start, end_date: end });
-  btn.disabled = false; btn.textContent = '공지 등록';
-  if (error) { msg.style.color='var(--delayed)'; msg.textContent = error.message; return; }
-  msg.style.color='var(--done)'; msg.textContent='공지가 등록됐어요!';
-  $('notice-content').value = '';
-  $('notice-start').value = '';
-  $('notice-end').value = '';
-  renderAdminNotices();
-}
-
-async function checkAndShowNotice() {
-  const { data, error } = await sb
-    .from('announcements')
-    .select('*')
-    .eq('is_active', true)
-    .lte('start_date', todayStr)
-    .gte('end_date', todayStr)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return;
-
-  const dismissKey = `notice_dismissed_${data.id}`;
-  if (localStorage.getItem(dismissKey) === todayStr) return;
-
-  // 제목/날짜 파싱 (첫 줄이 제목 역할)
-  const lines = (data.content || '').split('\n');
-  let titleText = '';
-  let bodyText  = data.content;
-  if (lines[0] && lines[0].trim()) {
-    titleText = lines[0].trim();
-    bodyText  = lines.slice(1).join('\n').replace(/^\n+/, '');
-  }
-
-  $('notice-popup-title').textContent = titleText;
-  $('notice-popup-date').textContent  = data.start_date ? `${data.start_date} 기준` : '';
-  $('notice-popup-body').textContent  = bodyText;
-  $('notice-popup-overlay').classList.add('open');
-
-  $('notice-confirm-btn').onclick = () => {
-    $('notice-popup-overlay').classList.remove('open');
-  };
-  $('notice-dismiss-btn').onclick = () => {
-    localStorage.setItem(dismissKey, todayStr);
-    $('notice-popup-overlay').classList.remove('open');
-  };
 }
 
 async function loadAndRenderBugReports() {
@@ -1696,24 +1455,10 @@ async function addCustomSubject() {
 }
 
 /* =============================================================
-   12-0. 마이 팝업 (모바일)
-============================================================= */
-function openMobMyPopup() {
-  const username = (currentUser?.email || '').replace('@suran.app', '');
-  $('mob-my-username').textContent = username;
-  $('mob-my-overlay').classList.add('open');
-}
-function closeMobMyPopup() {
-  $('mob-my-overlay').classList.remove('open');
-}
-
-/* =============================================================
    12-1. 주차 설정
 ============================================================= */
 function openWeekSettingModal() {
-  $('week-start-input').value  = fmtDate(userWeekStart);
-  $('week-range-from').value   = visibleWeekRange.from;
-  $('week-range-to').value     = visibleWeekRange.to;
+  $('week-start-input').value = fmtDate(userWeekStart);
   $('week-setting-overlay').classList.add('open');
 }
 
@@ -1722,15 +1467,8 @@ function closeWeekSettingModal() {
 }
 
 async function saveWeekSetting() {
-  const val  = $('week-start-input').value;
+  const val = $('week-start-input').value;
   if (!val) return;
-
-  const fromVal = parseInt($('week-range-from').value) || 1;
-  const toVal   = parseInt($('week-range-to').value)   || 12;
-  if (fromVal < 1 || toVal > 24 || fromVal > toVal) {
-    alert('주차 범위가 올바르지 않습니다. (1~24 사이, 시작 ≤ 끝)');
-    return;
-  }
 
   const saveBtn = $('week-setting-save-btn');
   saveBtn.disabled = true;
@@ -1747,8 +1485,6 @@ async function saveWeekSetting() {
   if (error) { console.error('saveWeekSetting:', error); return; }
 
   userWeekStart = new Date(val);
-  visibleWeekRange = { from: fromVal, to: toVal };
-  saveWeekRange();
   activeWeek = detectWeekFromDate(todayStr);
   closeWeekSettingModal();
   renderSchedule();
@@ -1831,11 +1567,6 @@ function bindEvents() {
     activeSubject = btn.dataset.subject;
     renderSchedule();
   });
-
-  // 마이 팝업 (모바일)
-  $('mob-my-btn').addEventListener('click', openMobMyPopup);
-  $('mob-my-overlay').addEventListener('click', e => { if (e.target === $('mob-my-overlay')) closeMobMyPopup(); });
-  $('mob-my-logout-btn').addEventListener('click', () => { closeMobMyPopup(); $('logout-btn').click(); });
 
   // 설정 버튼
   $('settings-btn').addEventListener('click', openSettingsModal);
@@ -1930,27 +1661,9 @@ function bindEvents() {
     if (e.target === $('daily-check-overlay')) closeDailyCheckModal();
   });
 
-  // 주차 슬라이드 (데스크톱 화살표 — 모바일에선 CSS로 숨김)
+  // 주차 슬라이드
   $('week-prev').addEventListener('click', () => { $('week-tabs').scrollLeft -= 200; });
   $('week-next').addEventListener('click', () => { $('week-tabs').scrollLeft += 200; });
-
-  // 마우스 드래그 슬라이드 (과목필터 + 주차탭)
-  function addDragScroll(el) {
-    let isDown = false, startX, scrollStart;
-    el.addEventListener('mousedown', e => {
-      isDown = true; startX = e.pageX - el.offsetLeft; scrollStart = el.scrollLeft;
-      el.style.cursor = 'grabbing';
-    });
-    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = ''; });
-    el.addEventListener('mouseup',    () => { isDown = false; el.style.cursor = ''; });
-    el.addEventListener('mousemove',  e => {
-      if (!isDown) return;
-      e.preventDefault();
-      el.scrollLeft = scrollStart - (e.pageX - el.offsetLeft - startX);
-    });
-  }
-  addDragScroll($('subject-filter'));
-  addDragScroll($('week-tabs'));
 
   // 주차 설정 모달
   $('week-setting-btn').addEventListener('click', openWeekSettingModal);
@@ -2004,47 +1717,15 @@ function bindEvents() {
     $('bug-char-count').textContent = `${$('bug-message').value.length} / 500`;
   });
 
-  // 공지 등록
-  $('notice-submit-btn').addEventListener('click', submitNotice);
-
-  // 공지 미리보기 (작성 폼)
-  $('notice-preview-btn').addEventListener('click', () => {
-    const content = $('notice-content').value.trim();
-    if (!content) { alert('내용을 먼저 입력해주세요.'); return; }
-    showNoticePreview(content, '작성 중인 내용입니다');
-  });
-
-  // 업데이트 공지 양식 버튼
-  $('notice-template-btn').addEventListener('click', () => {
-    const today = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
-    $('notice-content').value =
-`업데이트 안내
-
-ver.
-
-📅 ${today}
-
-─────────────────────
-✅
-✅
-✅
-─────────────────────
-
-항상 이용해 주셔서 감사합니다 🙏`;
-    $('notice-content').focus();
-  });
-
   // 관리자 탭 전환
   document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('admin-tab--active'));
       tab.classList.add('admin-tab--active');
       const which = tab.dataset.adminTab;
-      $('admin-tab-users').style.display   = which === 'users'   ? '' : 'none';
-      $('admin-tab-bugs').style.display    = which === 'bugs'    ? '' : 'none';
-      $('admin-tab-notices').style.display = which === 'notices' ? '' : 'none';
-      if (which === 'bugs')    loadAndRenderBugReports();
-      if (which === 'notices') renderAdminNotices();
+      $('admin-tab-users').style.display = which === 'users' ? '' : 'none';
+      $('admin-tab-bugs').style.display  = which === 'bugs'  ? '' : 'none';
+      if (which === 'bugs') loadAndRenderBugReports();
     });
   });
 
@@ -2116,15 +1797,6 @@ async function onLogin(user) {
       || getMondayOfWeek(profile?.created_at || user.created_at || todayStr);
     userWeekStart = new Date(weekStartStr);
 
-    // suran 계정은 주차 범위 기본값 24주차
-    if (!localStorage.getItem('weekRange')) {
-      const username = (profile?.email || user.email || '').replace('@suran.app', '');
-      if (username === 'suran') {
-        visibleWeekRange = { from: 1, to: 24 };
-        saveWeekRange();
-      }
-    }
-
     // 유저 설정 적용
     userSettings.scheduleLabel = profile?.schedule_label || '공부 스케줄';
     userSettings.calendarLabel = profile?.calendar_label || '공부 달력';
@@ -2146,7 +1818,6 @@ async function onLogin(user) {
       await loadCourses(user.id);
       activeWeek = detectWeekFromDate(todayStr);
       renderSchedule();
-      checkAndShowNotice();
     }
   } catch (err) {
     console.error('[onLogin] 오류:', err);

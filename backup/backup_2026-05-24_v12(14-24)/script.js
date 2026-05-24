@@ -42,12 +42,10 @@ function runTypewriter(el, text, speed = 110) {
 }
 
 function initTypewriter() {
-  const sidebar  = document.querySelector('.sidebar__brand');
-  const auth     = document.querySelector('.auth-brand');
-  const mobTitle = document.querySelector('.mob-topbar');
-  if (sidebar)  runTypewriter(sidebar,  '👊\n아무튼\n딴짓하면\n꿀밤!');
-  if (auth)     runTypewriter(auth,     '👊\n아무튼 딴짓하면 꿀밤!');
-  if (mobTitle) runTypewriter(mobTitle, '👊 아무튼 딴짓하면 꿀밤!', 80);
+  const sidebar = document.querySelector('.sidebar__brand');
+  const auth    = document.querySelector('.auth-brand');
+  if (sidebar) runTypewriter(sidebar, '👊\n아무튼\n딴짓하면\n꿀밤!');
+  if (auth)    runTypewriter(auth,    '👊\n아무튼 딴짓하면 꿀밤!');
 }
 
 /* ── 숫자 카운트업 ── */
@@ -88,13 +86,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 ============================================================= */
 const WEEKS = Array.from({ length: 24 }, (_, i) => i + 1);
 let userWeekStart = new Date('2026-05-11'); // 로그인 후 프로필에서 덮어씀
-
-// 표시할 주차 범위 (localStorage 에서 복원)
-let visibleWeekRange = (() => {
-  try { return JSON.parse(localStorage.getItem('weekRange')) || { from: 1, to: 12 }; }
-  catch { return { from: 1, to: 12 }; }
-})();
-function saveWeekRange() { localStorage.setItem('weekRange', JSON.stringify(visibleWeekRange)); }
 
 const SUBJECTS = {
   wireless:    { label: '📡 무선공학', cls: 'wireless' },
@@ -455,30 +446,10 @@ function updateSummary() {
   $('overall-bar').style.width = rate + '%';
 }
 
-function renderWeekTabs(scrollHint = 'active') {
-  // scrollHint: 'active' | 'end' | 'start'
+function renderWeekTabs() {
   const nav = $('week-tabs');
   nav.innerHTML = '';
-
-  const from = Math.max(1, visibleWeekRange.from);
-  const to   = Math.min(24, visibleWeekRange.to);
-
-  // - 버튼: 항상 표시, 맨 왼쪽 주차를 제거
-  const subBtn = document.createElement('button');
-  subBtn.className = 'week-add-btn';
-  subBtn.title = `${from}주차 숨기기`;
-  subBtn.textContent = '−';
-  subBtn.disabled = from >= to;
-  subBtn.addEventListener('click', () => {
-    if (visibleWeekRange.from >= visibleWeekRange.to) return;
-    visibleWeekRange.from = visibleWeekRange.from + 1;
-    if (activeWeek < visibleWeekRange.from) { activeWeek = visibleWeekRange.from; }
-    saveWeekRange();
-    renderWeekTabs('start');
-  });
-  nav.appendChild(subBtn);
-
-  WEEKS.filter(w => w >= from && w <= to).forEach(week => {
+  WEEKS.forEach(week => {
     const count = courses.filter(c =>
       c.week === week && (activeSubject === 'all' || c.subject === activeSubject)
     ).length;
@@ -488,31 +459,8 @@ function renderWeekTabs(scrollHint = 'active') {
     btn.addEventListener('click', () => { activeWeek = week; renderSchedule(); });
     nav.appendChild(btn);
   });
-
-  // + 버튼: 끝 주차가 24 미만일 때 표시
-  if (to < 24) {
-    const addBtn = document.createElement('button');
-    addBtn.className = 'week-add-btn';
-    addBtn.title = `${to + 1}주차 표시`;
-    addBtn.textContent = '+';
-    addBtn.addEventListener('click', () => {
-      visibleWeekRange.to = Math.min(24, visibleWeekRange.to + 1);
-      saveWeekRange();
-      renderWeekTabs('end');
-    });
-    nav.appendChild(addBtn);
-  }
-
-  if (scrollHint === 'end') {
-    const last = nav.lastElementChild;
-    if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
-  } else if (scrollHint === 'start') {
-    const first = nav.firstElementChild;
-    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-  } else {
-    const activeTab = nav.querySelector('.week-tab.active');
-    if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
+  const activeTab = nav.querySelector('.week-tab.active');
+  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 function renderTableRows() {
@@ -1696,24 +1644,10 @@ async function addCustomSubject() {
 }
 
 /* =============================================================
-   12-0. 마이 팝업 (모바일)
-============================================================= */
-function openMobMyPopup() {
-  const username = (currentUser?.email || '').replace('@suran.app', '');
-  $('mob-my-username').textContent = username;
-  $('mob-my-overlay').classList.add('open');
-}
-function closeMobMyPopup() {
-  $('mob-my-overlay').classList.remove('open');
-}
-
-/* =============================================================
    12-1. 주차 설정
 ============================================================= */
 function openWeekSettingModal() {
-  $('week-start-input').value  = fmtDate(userWeekStart);
-  $('week-range-from').value   = visibleWeekRange.from;
-  $('week-range-to').value     = visibleWeekRange.to;
+  $('week-start-input').value = fmtDate(userWeekStart);
   $('week-setting-overlay').classList.add('open');
 }
 
@@ -1722,15 +1656,8 @@ function closeWeekSettingModal() {
 }
 
 async function saveWeekSetting() {
-  const val  = $('week-start-input').value;
+  const val = $('week-start-input').value;
   if (!val) return;
-
-  const fromVal = parseInt($('week-range-from').value) || 1;
-  const toVal   = parseInt($('week-range-to').value)   || 12;
-  if (fromVal < 1 || toVal > 24 || fromVal > toVal) {
-    alert('주차 범위가 올바르지 않습니다. (1~24 사이, 시작 ≤ 끝)');
-    return;
-  }
 
   const saveBtn = $('week-setting-save-btn');
   saveBtn.disabled = true;
@@ -1747,8 +1674,6 @@ async function saveWeekSetting() {
   if (error) { console.error('saveWeekSetting:', error); return; }
 
   userWeekStart = new Date(val);
-  visibleWeekRange = { from: fromVal, to: toVal };
-  saveWeekRange();
   activeWeek = detectWeekFromDate(todayStr);
   closeWeekSettingModal();
   renderSchedule();
@@ -1831,11 +1756,6 @@ function bindEvents() {
     activeSubject = btn.dataset.subject;
     renderSchedule();
   });
-
-  // 마이 팝업 (모바일)
-  $('mob-my-btn').addEventListener('click', openMobMyPopup);
-  $('mob-my-overlay').addEventListener('click', e => { if (e.target === $('mob-my-overlay')) closeMobMyPopup(); });
-  $('mob-my-logout-btn').addEventListener('click', () => { closeMobMyPopup(); $('logout-btn').click(); });
 
   // 설정 버튼
   $('settings-btn').addEventListener('click', openSettingsModal);
@@ -1930,27 +1850,9 @@ function bindEvents() {
     if (e.target === $('daily-check-overlay')) closeDailyCheckModal();
   });
 
-  // 주차 슬라이드 (데스크톱 화살표 — 모바일에선 CSS로 숨김)
+  // 주차 슬라이드
   $('week-prev').addEventListener('click', () => { $('week-tabs').scrollLeft -= 200; });
   $('week-next').addEventListener('click', () => { $('week-tabs').scrollLeft += 200; });
-
-  // 마우스 드래그 슬라이드 (과목필터 + 주차탭)
-  function addDragScroll(el) {
-    let isDown = false, startX, scrollStart;
-    el.addEventListener('mousedown', e => {
-      isDown = true; startX = e.pageX - el.offsetLeft; scrollStart = el.scrollLeft;
-      el.style.cursor = 'grabbing';
-    });
-    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = ''; });
-    el.addEventListener('mouseup',    () => { isDown = false; el.style.cursor = ''; });
-    el.addEventListener('mousemove',  e => {
-      if (!isDown) return;
-      e.preventDefault();
-      el.scrollLeft = scrollStart - (e.pageX - el.offsetLeft - startX);
-    });
-  }
-  addDragScroll($('subject-filter'));
-  addDragScroll($('week-tabs'));
 
   // 주차 설정 모달
   $('week-setting-btn').addEventListener('click', openWeekSettingModal);
@@ -2115,15 +2017,6 @@ async function onLogin(user) {
     const weekStartStr = profile?.week_start_date
       || getMondayOfWeek(profile?.created_at || user.created_at || todayStr);
     userWeekStart = new Date(weekStartStr);
-
-    // suran 계정은 주차 범위 기본값 24주차
-    if (!localStorage.getItem('weekRange')) {
-      const username = (profile?.email || user.email || '').replace('@suran.app', '');
-      if (username === 'suran') {
-        visibleWeekRange = { from: 1, to: 24 };
-        saveWeekRange();
-      }
-    }
 
     // 유저 설정 적용
     userSettings.scheduleLabel = profile?.schedule_label || '공부 스케줄';

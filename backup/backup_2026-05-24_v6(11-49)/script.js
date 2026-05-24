@@ -42,12 +42,10 @@ function runTypewriter(el, text, speed = 110) {
 }
 
 function initTypewriter() {
-  const sidebar  = document.querySelector('.sidebar__brand');
-  const auth     = document.querySelector('.auth-brand');
-  const mobTitle = document.querySelector('.mob-topbar');
-  if (sidebar)  runTypewriter(sidebar,  '👊\n아무튼\n딴짓하면\n꿀밤!');
-  if (auth)     runTypewriter(auth,     '👊\n아무튼 딴짓하면 꿀밤!');
-  if (mobTitle) runTypewriter(mobTitle, '👊 아무튼 딴짓하면 꿀밤!', 80);
+  const sidebar = document.querySelector('.sidebar__brand');
+  const auth    = document.querySelector('.auth-brand');
+  if (sidebar) runTypewriter(sidebar, '👊\n수란이\n딴짓하면\n꿀밤!');
+  if (auth)    runTypewriter(auth,    '👊\n수란이 딴짓하면 꿀밤!');
 }
 
 /* ── 숫자 카운트업 ── */
@@ -87,14 +85,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
    2. 상수 & 기본 데이터
 ============================================================= */
 const WEEKS = Array.from({ length: 24 }, (_, i) => i + 1);
-let userWeekStart = new Date('2026-05-11'); // 로그인 후 프로필에서 덮어씀
-
-// 표시할 주차 범위 (localStorage 에서 복원)
-let visibleWeekRange = (() => {
-  try { return JSON.parse(localStorage.getItem('weekRange')) || { from: 1, to: 12 }; }
-  catch { return { from: 1, to: 12 }; }
-})();
-function saveWeekRange() { localStorage.setItem('weekRange', JSON.stringify(visibleWeekRange)); }
+const WEEK_BASE_START = new Date('2026-05-11');
 
 const SUBJECTS = {
   wireless:    { label: '📡 무선공학', cls: 'wireless' },
@@ -180,14 +171,7 @@ let currentUser   = null;
 let isAdmin       = false;
 let viewingUserId = null;
 let eventsBound   = false;
-let loggingIn     = false;
-
-let userSettings = {
-  scheduleLabel:  '공부 스케줄',
-  calendarLabel:  '공부 달력',
-  theme:          'dark',
-  customSubjects: { hidden: [], extras: [] },
-};
+let loggingIn     = false; // 동시 로그인 처리 방지
 
 const today    = new Date();
 let calYear    = today.getFullYear();
@@ -224,8 +208,8 @@ function dayToGridCol(date) {
 const todayStr = fmtDate(today);
 
 function getWeekRange(week) {
-  const start = new Date(userWeekStart);
-  start.setDate(userWeekStart.getDate() + (week - 1) * 7);
+  const start = new Date(WEEK_BASE_START);
+  start.setDate(WEEK_BASE_START.getDate() + (week - 1) * 7);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   return { start: fmtDate(start), end: fmtDate(end) };
@@ -233,17 +217,9 @@ function getWeekRange(week) {
 
 function detectWeekFromDate(dateStr) {
   const d = new Date(dateStr);
-  const diffDays = Math.floor((d - userWeekStart) / 86400000);
+  const diffDays = Math.floor((d - WEEK_BASE_START) / 86400000);
   if (diffDays < 0) return 1;
   return Math.min(Math.floor(diffDays / 7) + 1, 24);
-}
-
-function getMondayOfWeek(dateStr) {
-  const d = new Date(dateStr);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return fmtDate(d);
 }
 
 function toDbRow(course, userId) {
@@ -300,21 +276,19 @@ async function loadCourses(userId) {
   if (!data || data.length === 0) {
     if (isViewingOther) { courses = []; return; }
 
-    // 구버전 localStorage 데이터 마이그레이션 (없으면 빈 상태로 시작)
+    // localStorage 데이터 우선 마이그레이션, 없으면 기본 데이터
     const stored = localStorage.getItem('schedule_v8');
-    if (stored) {
-      const source = JSON.parse(stored);
-      const toInsert = source.map(c => toDbRow({ ...c, id: crypto.randomUUID() }, userId));
-      const { data: inserted, error: insertErr } = await sb
-        .from('courses').insert(toInsert).select();
-      if (insertErr) { console.error('insertDefaults:', insertErr); return; }
-      courses = (inserted || []).map(fromDbRow);
-      localStorage.removeItem('schedule_v8');
-      console.log('[loadCourses] localStorage 마이그레이션:', courses.length, '개');
-    } else {
-      courses = [];
-      console.log('[loadCourses] 새 계정 빈 상태로 시작');
-    }
+    const source = stored ? JSON.parse(stored) : DEFAULT_COURSES;
+    const toInsert = source.map(c => toDbRow({ ...c, id: crypto.randomUUID() }, userId));
+
+    const { data: inserted, error: insertErr } = await sb
+      .from('courses').insert(toInsert).select();
+    if (insertErr) { console.error('insertDefaults:', insertErr); return; }
+    courses = (inserted || []).map(fromDbRow);
+    console.log('[loadCourses] 기본 데이터 삽입:', courses.length, '개');
+
+    // 마이그레이션 완료 후 localStorage 정리
+    if (stored) localStorage.removeItem('schedule_v8');
   } else {
     courses = data.map(fromDbRow);
     console.log('[loadCourses] 로드 완료:', courses.length, '개');
@@ -455,30 +429,10 @@ function updateSummary() {
   $('overall-bar').style.width = rate + '%';
 }
 
-function renderWeekTabs(scrollHint = 'active') {
-  // scrollHint: 'active' | 'end' | 'start'
+function renderWeekTabs() {
   const nav = $('week-tabs');
   nav.innerHTML = '';
-
-  const from = Math.max(1, visibleWeekRange.from);
-  const to   = Math.min(24, visibleWeekRange.to);
-
-  // - 버튼: 항상 표시, 맨 왼쪽 주차를 제거
-  const subBtn = document.createElement('button');
-  subBtn.className = 'week-add-btn';
-  subBtn.title = `${from}주차 숨기기`;
-  subBtn.textContent = '−';
-  subBtn.disabled = from >= to;
-  subBtn.addEventListener('click', () => {
-    if (visibleWeekRange.from >= visibleWeekRange.to) return;
-    visibleWeekRange.from = visibleWeekRange.from + 1;
-    if (activeWeek < visibleWeekRange.from) { activeWeek = visibleWeekRange.from; }
-    saveWeekRange();
-    renderWeekTabs('start');
-  });
-  nav.appendChild(subBtn);
-
-  WEEKS.filter(w => w >= from && w <= to).forEach(week => {
+  WEEKS.forEach(week => {
     const count = courses.filter(c =>
       c.week === week && (activeSubject === 'all' || c.subject === activeSubject)
     ).length;
@@ -488,31 +442,8 @@ function renderWeekTabs(scrollHint = 'active') {
     btn.addEventListener('click', () => { activeWeek = week; renderSchedule(); });
     nav.appendChild(btn);
   });
-
-  // + 버튼: 끝 주차가 24 미만일 때 표시
-  if (to < 24) {
-    const addBtn = document.createElement('button');
-    addBtn.className = 'week-add-btn';
-    addBtn.title = `${to + 1}주차 표시`;
-    addBtn.textContent = '+';
-    addBtn.addEventListener('click', () => {
-      visibleWeekRange.to = Math.min(24, visibleWeekRange.to + 1);
-      saveWeekRange();
-      renderWeekTabs('end');
-    });
-    nav.appendChild(addBtn);
-  }
-
-  if (scrollHint === 'end') {
-    const last = nav.lastElementChild;
-    if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
-  } else if (scrollHint === 'start') {
-    const first = nav.firstElementChild;
-    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-  } else {
-    const activeTab = nav.querySelector('.week-tab.active');
-    if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
+  const activeTab = nav.querySelector('.week-tab.active');
+  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 function renderTableRows() {
@@ -578,7 +509,6 @@ function renderTableRows() {
 }
 
 function renderSchedule() {
-  renderSubjectFilter();
   updateSummary();
   renderWeekTabs();
   renderTableRows();
@@ -949,7 +879,6 @@ function openModal(editId = null) {
   $('f-week').innerHTML = WEEKS.map(w =>
     `<option value="${w}" ${w === activeWeek ? 'selected' : ''}>${w}주차</option>`
   ).join('');
-  populateSubjectSelect();
 
   if (editId) {
     const course = courses.find(c => c.id === editId);
@@ -969,7 +898,7 @@ function openModal(editId = null) {
     $('f-start-date').value = course.startDate || '';
     $('f-end-date').value   = course.endDate   || '';
   } else {
-    $('modal-title').textContent = '추가';
+    $('modal-title').textContent = '공부 추가';
     $('course-form').reset();
     $('edit-id').value  = '';
     $('f-week').value   = activeWeek;
@@ -1079,7 +1008,7 @@ async function renderAdminUsers() {
 
   if (error) { console.error('renderAdminUsers:', error); return; }
 
-  tbody.innerHTML = (profiles || []).sort((a, b) => (b.is_admin ? 1 : 0) - (a.is_admin ? 1 : 0)).map(profile => {
+  tbody.innerHTML = (profiles || []).map(profile => {
     const userCourses = (allCourses || []).filter(c => c.user_id === profile.id);
     const total = userCourses.length;
     const done  = userCourses.filter(c => c.status === 'done').length;
@@ -1087,7 +1016,7 @@ async function renderAdminUsers() {
     const joinDate = new Date(profile.created_at).toLocaleDateString('ko-KR');
     const isMe = profile.id === currentUser.id;
     return `<tr>
-      <td>${esc((profile.email || '-').replace('@suran.app', ''))}${isMe ? ' <span class="badge badge--default" style="font-size:0.7rem">나</span>' : ''}${profile.is_admin ? ' <span class="badge badge--done" style="font-size:0.7rem">admin</span>' : ''}</td>
+      <td>${esc(profile.email || '-')}${isMe ? ' <span class="badge badge--default" style="font-size:0.7rem">나</span>' : ''}${profile.is_admin ? ' <span class="badge badge--done" style="font-size:0.7rem">admin</span>' : ''}</td>
       <td style="color:var(--muted)">${joinDate}</td>
       <td>${profile.is_admin ? '<span style="color:var(--muted)">-</span>' : total}</td>
       <td style="color:var(--done)">${profile.is_admin ? '<span style="color:var(--muted)">-</span>' : done}</td>
@@ -1109,9 +1038,9 @@ async function renderAdminUsers() {
       await loadCourses(uid);
       activeWeek = detectWeekFromDate(todayStr);
       activeSubject = 'all';
-      $('subject-filter').querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
-      $('subject-filter').querySelector('.subject-btn[data-subject="all"]')?.classList.add('active');
-      showAdminBanner(email.replace('@suran.app', ''));
+      document.querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.subject-btn[data-subject="all"]').classList.add('active');
+      showAdminBanner(email);
       switchView('schedule');
       renderSchedule();
     });
@@ -1190,195 +1119,6 @@ async function handleBugReportSubmit(e) {
   }
 }
 
-/* =============================================================
-   공지 관리
-============================================================= */
-function showNoticePreview(content, dateLabel = '') {
-  const lines     = (content || '').split('\n');
-  const titleText = lines[0].trim();
-  const bodyText  = lines.slice(1).join('\n').replace(/^\n+/, '');
-  $('notice-popup-badge').textContent = '📢 미리보기';
-  $('notice-popup-title').textContent = titleText;
-  $('notice-popup-date').textContent  = dateLabel || '미리보기';
-  $('notice-popup-body').textContent  = bodyText;
-  $('notice-popup-overlay').classList.add('open');
-  $('notice-confirm-btn').onclick = () => $('notice-popup-overlay').classList.remove('open');
-  const dismissBtn = $('notice-dismiss-btn');
-  dismissBtn.textContent = '닫기';
-  dismissBtn.onclick = () => $('notice-popup-overlay').classList.remove('open');
-}
-
-async function renderAdminNotices() {
-  const listEl = $('notice-admin-list');
-  listEl.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">불러오는 중...</p>';
-
-  const { data, error } = await sb
-    .from('announcements')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) { listEl.innerHTML = '<p style="color:var(--delayed);padding:20px">불러오기 실패</p>'; return; }
-  if (!data?.length) { listEl.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">등록된 공지가 없어요.</p>'; return; }
-
-  const now = todayStr;
-  listEl.innerHTML = `<div class="notice-list-wrap">${data.map(n => {
-    const expired = n.end_date < now;
-    const created = new Date(n.created_at).toLocaleDateString('ko-KR');
-    const updated = n.updated_at !== n.created_at
-      ? ` · 수정 ${new Date(n.updated_at).toLocaleDateString('ko-KR')}` : '';
-    return `<div class="notice-admin-item${expired ? ' notice-admin-item--expired' : ''}" data-nid="${n.id}">
-      <div class="notice-admin-item__meta">
-        <span>${n.start_date} ~ ${n.end_date}</span>
-        <span>작성 ${created}${updated}</span>
-        ${expired ? '<span style="color:var(--delayed)">기간 종료</span>' : (n.is_active ? '<span style="color:var(--done)">활성</span>' : '<span style="color:var(--muted)">비활성</span>')}
-      </div>
-      <div class="notice-admin-item__content">${esc(n.content)}</div>
-      <div class="notice-admin-item__actions">
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px" data-preview-notice="${n.id}">미리보기</button>
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px" data-append-notice="${n.id}">내용 수정</button>
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px;color:${n.is_active ? 'var(--muted)' : 'var(--done)'}" data-toggle-notice="${n.id}" data-active="${n.is_active}">${n.is_active ? '비활성화' : '활성화'}</button>
-        <button class="btn btn--ghost" style="font-size:0.8rem;padding:5px 12px;color:var(--delayed)" data-delete-notice="${n.id}">삭제</button>
-      </div>
-      <div class="notice-admin-item__append" id="notice-append-${n.id}" style="display:none;flex-direction:column;gap:8px">
-        <textarea class="form-input" rows="4" id="notice-append-input-${n.id}"></textarea>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="date" class="form-input" id="notice-edit-start-${n.id}" style="flex:1">
-          <span style="color:var(--muted);font-size:0.85rem">~</span>
-          <input type="date" class="form-input" id="notice-edit-end-${n.id}" style="flex:1">
-          <button class="btn btn--primary" style="font-size:0.8rem;padding:5px 14px;white-space:nowrap" data-save-append="${n.id}">저장</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('')}</div>`;
-
-  // 미리보기
-  listEl.querySelectorAll('[data-preview-notice]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const nid    = btn.dataset.previewNotice;
-      const notice = data.find(n => n.id === nid);
-      if (!notice) return;
-      showNoticePreview(notice.content, `${notice.start_date} ~ ${notice.end_date}`);
-    });
-  });
-
-  // 내용 수정 토글
-  listEl.querySelectorAll('[data-append-notice]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const nid      = btn.dataset.appendNotice;
-      const row      = $(`notice-append-${nid}`);
-      const textarea = $(`notice-append-input-${nid}`);
-      const isHidden = row.style.display === 'none';
-      if (isHidden) {
-        const original = data.find(n => n.id === nid);
-        if (original) {
-          textarea.value = original.content;
-          const startEl = $(`notice-edit-start-${nid}`);
-          const endEl   = $(`notice-edit-end-${nid}`);
-          if (startEl) startEl.value = original.start_date;
-          if (endEl)   endEl.value   = original.end_date;
-        }
-      }
-      row.style.display = isHidden ? 'flex' : 'none';
-    });
-  });
-
-  // 수정 저장
-  listEl.querySelectorAll('[data-save-append]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const nid        = btn.dataset.saveAppend;
-      const newContent = $(`notice-append-input-${nid}`)?.value.trim();
-      const newStart   = $(`notice-edit-start-${nid}`)?.value;
-      const newEnd     = $(`notice-edit-end-${nid}`)?.value;
-      if (!newContent) return;
-      const updates = { content: newContent, updated_at: new Date().toISOString() };
-      if (newStart) updates.start_date = newStart;
-      if (newEnd)   updates.end_date   = newEnd;
-      const { error } = await sb.from('announcements')
-        .update(updates)
-        .eq('id', nid);
-      if (!error) renderAdminNotices();
-    });
-  });
-
-  // 활성/비활성 토글
-  listEl.querySelectorAll('[data-toggle-notice]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const nid    = btn.dataset.toggleNotice;
-      const active = btn.dataset.active === 'true';
-      await sb.from('announcements').update({ is_active: !active }).eq('id', nid);
-      renderAdminNotices();
-    });
-  });
-
-  // 삭제
-  listEl.querySelectorAll('[data-delete-notice]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('공지를 삭제할까요?')) return;
-      const nid = btn.dataset.deleteNotice;
-      await sb.from('announcements').delete().eq('id', nid);
-      renderAdminNotices();
-    });
-  });
-}
-
-async function submitNotice() {
-  const content = $('notice-content').value.trim();
-  const start   = $('notice-start').value;
-  const end     = $('notice-end').value;
-  const msg     = $('notice-write-msg');
-  if (!content || !start || !end) { msg.style.color='var(--delayed)'; msg.textContent='내용과 기간을 모두 입력해주세요.'; return; }
-  if (start > end) { msg.style.color='var(--delayed)'; msg.textContent='종료일이 시작일보다 빠릅니다.'; return; }
-  const btn = $('notice-submit-btn');
-  btn.disabled = true; btn.textContent = '등록 중...';
-  const { error } = await sb.from('announcements').insert({ content, start_date: start, end_date: end });
-  btn.disabled = false; btn.textContent = '공지 등록';
-  if (error) { msg.style.color='var(--delayed)'; msg.textContent = error.message; return; }
-  msg.style.color='var(--done)'; msg.textContent='공지가 등록됐어요!';
-  $('notice-content').value = '';
-  $('notice-start').value = '';
-  $('notice-end').value = '';
-  renderAdminNotices();
-}
-
-async function checkAndShowNotice() {
-  const { data, error } = await sb
-    .from('announcements')
-    .select('*')
-    .eq('is_active', true)
-    .lte('start_date', todayStr)
-    .gte('end_date', todayStr)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return;
-
-  const dismissKey = `notice_dismissed_${data.id}`;
-  if (localStorage.getItem(dismissKey) === todayStr) return;
-
-  // 제목/날짜 파싱 (첫 줄이 제목 역할)
-  const lines = (data.content || '').split('\n');
-  let titleText = '';
-  let bodyText  = data.content;
-  if (lines[0] && lines[0].trim()) {
-    titleText = lines[0].trim();
-    bodyText  = lines.slice(1).join('\n').replace(/^\n+/, '');
-  }
-
-  $('notice-popup-title').textContent = titleText;
-  $('notice-popup-date').textContent  = data.start_date ? `${data.start_date} 기준` : '';
-  $('notice-popup-body').textContent  = bodyText;
-  $('notice-popup-overlay').classList.add('open');
-
-  $('notice-confirm-btn').onclick = () => {
-    $('notice-popup-overlay').classList.remove('open');
-  };
-  $('notice-dismiss-btn').onclick = () => {
-    localStorage.setItem(dismissKey, todayStr);
-    $('notice-popup-overlay').classList.remove('open');
-  };
-}
-
 async function loadAndRenderBugReports() {
   const list = $('bug-report-admin-list');
   list.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">불러오는 중...</p>';
@@ -1404,7 +1144,7 @@ async function loadAndRenderBugReports() {
     return `<div class="bug-admin-item${r.is_read ? '' : ' bug-admin-item--unread'}" data-id="${r.id}">
       <div class="bug-admin-item__meta">
         <span class="bug-admin-item__type bug-admin-item__type--${typeCls[r.type] || 'other'}">${typeLabel[r.type] || '기타'}</span>
-        <span class="bug-admin-item__email">${esc((r.user_email || '알 수 없음').replace('@suran.app', ''))}</span>
+        <span class="bug-admin-item__email">${esc(r.user_email || '알 수 없음')}</span>
         <span class="bug-admin-item__date">${date}</span>
       </div>
       <p class="bug-admin-item__message">${esc(r.message)}</p>
@@ -1423,338 +1163,6 @@ async function loadAndRenderBugReports() {
 }
 
 /* =============================================================
-   12. 설정
-============================================================= */
-function getSubjectOrder() {
-  const hidden    = userSettings.customSubjects.hidden || [];
-  const extras    = userSettings.customSubjects.extras || [];
-  const order     = userSettings.customSubjects.order  || [];
-  const defaultKs = Object.keys(SUBJECTS);
-  const extraKs   = extras.map(e => e.key);
-  const allKeys   = [...defaultKs, ...extraKs];
-  return order.length
-    ? [...order.filter(k => allKeys.includes(k)), ...allKeys.filter(k => !order.includes(k))]
-    : allKeys;
-}
-
-function computeUserSubjects() {
-  const hidden = userSettings.customSubjects.hidden || [];
-  const extras = userSettings.customSubjects.extras || [];
-  const result = {};
-  getSubjectOrder().forEach(key => {
-    if (hidden.includes(key)) return;
-    if (SUBJECTS[key]) {
-      result[key] = SUBJECTS[key];
-    } else {
-      const ex = extras.find(e => e.key === key);
-      if (ex) result[key] = { label: ex.label, cls: 'custom' };
-    }
-  });
-  return result;
-}
-
-function applyTheme(theme) {
-  userSettings.theme = theme;
-  document.body.classList.toggle('light', theme === 'light');
-  localStorage.setItem('theme', theme);
-  const darkBtn  = $('theme-dark-btn');
-  const lightBtn = $('theme-light-btn');
-  if (darkBtn)  darkBtn.classList.toggle('theme-option--active',  theme === 'dark');
-  if (lightBtn) lightBtn.classList.toggle('theme-option--active', theme === 'light');
-}
-
-function updateMenuLabels() {
-  const scheduleLabel = document.querySelector('[data-view="schedule"] .menu-label');
-  const calendarLabel = document.querySelector('[data-view="calendar"] .menu-label');
-  if (scheduleLabel) scheduleLabel.textContent = userSettings.scheduleLabel;
-  if (calendarLabel) calendarLabel.textContent = userSettings.calendarLabel;
-  const scheduleTitle = $('schedule-view-title');
-  const calendarTitle = $('calendar-view-title');
-  if (scheduleTitle) scheduleTitle.textContent = '📋 ' + userSettings.scheduleLabel;
-  if (calendarTitle) calendarTitle.textContent = '📅 ' + userSettings.calendarLabel;
-}
-
-function renderSubjectFilter() {
-  const filter = $('subject-filter');
-  if (!filter) return;
-  const subjects = computeUserSubjects();
-  filter.innerHTML = `<button class="subject-btn${activeSubject === 'all' ? ' active' : ''}" data-subject="all">전체</button>`
-    + Object.entries(subjects).map(([key, val]) =>
-        `<button class="subject-btn${activeSubject === key ? ' active' : ''}" data-subject="${key}">${val.label}</button>`
-      ).join('');
-}
-
-function populateSubjectSelect() {
-  const sel = $('f-subject');
-  if (!sel) return;
-  const subjects = computeUserSubjects();
-  sel.innerHTML = Object.entries(subjects).map(([key, val]) =>
-    `<option value="${key}">${val.label}</option>`
-  ).join('') + `<option value="custom">✏️ 직접 입력</option>`;
-}
-
-function openSettingsModal() {
-  // 현재 값으로 폼 초기화
-  $('new-password').value = '';
-  $('new-password-confirm').value = '';
-  $('pw-msg').textContent = '';
-  $('label-schedule').value = userSettings.scheduleLabel;
-  $('label-calendar').value = userSettings.calendarLabel;
-  $('label-msg').textContent = '';
-  $('subject-msg').textContent = '';
-  applyTheme(userSettings.theme);
-  renderSubjectManageList();
-  switchSettingsTab('info');
-  $('settings-overlay').classList.add('open');
-}
-
-function closeSettingsModal() {
-  $('settings-overlay').classList.remove('open');
-}
-
-function switchSettingsTab(tab) {
-  document.querySelectorAll('.settings-tab').forEach(t =>
-    t.classList.toggle('settings-tab--active', t.dataset.stab === tab)
-  );
-  document.querySelectorAll('.settings-panel').forEach(p =>
-    p.classList.toggle('hidden', p.id !== 'settings-panel-' + tab)
-  );
-}
-
-async function savePassword() {
-  const pw  = $('new-password').value;
-  const pw2 = $('new-password-confirm').value;
-  const msg = $('pw-msg');
-  if (pw.length < 6) { msg.style.color='var(--delayed)'; msg.textContent='6자 이상 입력해주세요.'; return; }
-  if (pw !== pw2)    { msg.style.color='var(--delayed)'; msg.textContent='비밀번호가 일치하지 않아요.'; return; }
-  const btn = $('pw-save-btn');
-  btn.disabled = true; btn.textContent = '변경 중...';
-  const { error } = await sb.auth.updateUser({ password: pw });
-  btn.disabled = false; btn.textContent = '변경하기';
-  if (error) { msg.style.color='var(--delayed)'; msg.textContent = error.message; }
-  else       { msg.style.color='var(--done)';    msg.textContent = '비밀번호가 변경됐어요!'; $('new-password').value=''; $('new-password-confirm').value=''; }
-}
-
-async function saveLabels() {
-  const sl = $('label-schedule').value.trim() || '공부 스케줄';
-  const cl = $('label-calendar').value.trim()  || '공부 달력';
-  const btn = $('label-save-btn');
-  const msg = $('label-msg');
-  btn.disabled = true; btn.textContent = '저장 중...';
-  const { error } = await sb.from('profiles').update({ schedule_label: sl, calendar_label: cl }).eq('id', currentUser.id);
-  btn.disabled = false; btn.textContent = '저장';
-  if (error) { msg.style.color='var(--delayed)'; msg.textContent = error.message; return; }
-  userSettings.scheduleLabel = sl;
-  userSettings.calendarLabel = cl;
-  updateMenuLabels();
-  msg.style.color='var(--done)'; msg.textContent = '저장됐어요!';
-}
-
-async function saveCustomSubjects() {
-  const { error } = await sb.from('profiles')
-    .update({ custom_subjects: userSettings.customSubjects })
-    .eq('id', currentUser.id);
-  if (error) console.error('saveCustomSubjects:', error);
-  else {
-    renderSubjectFilter();
-    populateSubjectSelect();
-  }
-}
-
-function setSubjectMsg(text, type = 'done') {
-  const msg = $('subject-msg');
-  if (!msg) return;
-  msg.style.color = type === 'done' ? 'var(--done)' : 'var(--delayed)';
-  msg.textContent = text;
-}
-
-function renderSubjectManageList() {
-  const list = $('subject-manage-list');
-  if (!list) return;
-  const hidden = userSettings.customSubjects.hidden || [];
-  const extras = userSettings.customSubjects.extras || [];
-
-  const orderedKeys = getSubjectOrder();
-  const items = orderedKeys.map(key => {
-    const isDefault = !!SUBJECTS[key];
-    const isHidden  = hidden.includes(key);
-    const label     = isDefault ? SUBJECTS[key].label : (extras.find(e => e.key === key)?.label || key);
-    const btns = isDefault
-      ? `<button class="btn btn--ghost" style="font-size:0.78rem;padding:4px 10px;color:${isHidden ? 'var(--done)' : 'var(--delayed)'}" data-toggle="${key}">${isHidden ? '복구' : '삭제'}</button>`
-      : `<button class="btn btn--ghost" style="font-size:0.78rem;padding:4px 10px" data-edit="${key}">수정</button>
-         <button class="btn btn--ghost" style="font-size:0.78rem;padding:4px 10px;color:var(--delayed)" data-delete="${key}">삭제</button>`;
-    return `<div class="subject-manage-item${isHidden ? ' subject-manage-item--hidden' : ''}" draggable="true" data-key="${key}">
-      <span class="subject-drag-handle">⠿</span>
-      <span class="subject-manage-item__label" id="slabel-${key}">${esc(label)}</span>
-      ${btns}
-    </div>`;
-  }).join('');
-
-  const inner = document.createElement('div');
-  inner.className = 'subject-manage-list-inner';
-  inner.innerHTML = items;
-  list.innerHTML = '';
-  list.appendChild(inner);
-
-  // 토글(삭제/복구)
-  inner.querySelectorAll('[data-toggle]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const key = btn.dataset.toggle;
-      const idx = userSettings.customSubjects.hidden.indexOf(key);
-      if (idx === -1) userSettings.customSubjects.hidden.push(key);
-      else userSettings.customSubjects.hidden.splice(idx, 1);
-      await saveCustomSubjects();
-      renderSubjectManageList();
-      setSubjectMsg('저장됐어요!');
-    });
-  });
-
-  // 수정
-  inner.querySelectorAll('[data-edit]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const key = btn.dataset.edit;
-      const ex  = userSettings.customSubjects.extras.find(e => e.key === key);
-      if (!ex) return;
-      const labelEl = $(`slabel-${key}`);
-      labelEl.innerHTML = `<input type="text" class="form-input" style="font-size:0.82rem;padding:4px 8px;height:auto" value="${esc(ex.label)}" maxlength="20" id="sedit-${key}">`;
-      btn.textContent = '저장';
-      delete btn.dataset.edit;
-      btn.addEventListener('click', async () => {
-        const newLabel = $(`sedit-${key}`)?.value.trim();
-        if (!newLabel) return;
-        ex.label = newLabel;
-        await saveCustomSubjects();
-        renderSubjectManageList();
-        setSubjectMsg('수정됐어요!');
-      }, { once: true });
-    });
-  });
-
-  // 삭제
-  inner.querySelectorAll('[data-delete]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const key = btn.dataset.delete;
-      const idx = userSettings.customSubjects.extras.findIndex(e => e.key === key);
-      if (idx !== -1) userSettings.customSubjects.extras.splice(idx, 1);
-      const oi = (userSettings.customSubjects.order || []).indexOf(key);
-      if (oi !== -1) userSettings.customSubjects.order.splice(oi, 1);
-      await saveCustomSubjects();
-      renderSubjectManageList();
-      setSubjectMsg('삭제됐어요!');
-    });
-  });
-
-  // 드래그 앤 드롭
-  let dragKey = null;
-  inner.querySelectorAll('.subject-manage-item').forEach(item => {
-    item.addEventListener('dragstart', e => {
-      dragKey = item.dataset.key;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      inner.querySelectorAll('.subject-manage-item').forEach(i => i.classList.remove('drag-over'));
-    });
-    item.addEventListener('dragover', e => {
-      e.preventDefault();
-      inner.querySelectorAll('.subject-manage-item').forEach(i => i.classList.remove('drag-over'));
-      item.classList.add('drag-over');
-    });
-    item.addEventListener('drop', async e => {
-      e.preventDefault();
-      const targetKey = item.dataset.key;
-      if (!dragKey || dragKey === targetKey) return;
-      const currentOrder = [...inner.querySelectorAll('.subject-manage-item')].map(i => i.dataset.key);
-      const from = currentOrder.indexOf(dragKey);
-      const to   = currentOrder.indexOf(targetKey);
-      currentOrder.splice(from, 1);
-      currentOrder.splice(to, 0, dragKey);
-      userSettings.customSubjects.order = currentOrder;
-      await saveCustomSubjects();
-      renderSubjectManageList();
-      setSubjectMsg('순서가 변경됐어요!');
-    });
-  });
-}
-
-async function addCustomSubject() {
-  const input = $('new-subject-input');
-  const label = input.value.trim();
-  const msg   = $('subject-msg');
-  if (!label) return;
-  const emoji = $('emoji-pick-btn').textContent.trim();
-  const key   = 'custom_' + Date.now();
-  userSettings.customSubjects.extras.push({ key, label: emoji + ' ' + label });
-  if (!userSettings.customSubjects.order) userSettings.customSubjects.order = [];
-  userSettings.customSubjects.order.push(key);
-  input.value = '';
-  $('emoji-pick-btn').textContent = '📚';
-  await saveCustomSubjects();
-  renderSubjectManageList();
-  msg.style.color = 'var(--done)'; msg.textContent = '과목이 추가됐어요!';
-}
-
-/* =============================================================
-   12-0. 마이 팝업 (모바일)
-============================================================= */
-function openMobMyPopup() {
-  const username = (currentUser?.email || '').replace('@suran.app', '');
-  $('mob-my-username').textContent = username;
-  $('mob-my-overlay').classList.add('open');
-}
-function closeMobMyPopup() {
-  $('mob-my-overlay').classList.remove('open');
-}
-
-/* =============================================================
-   12-1. 주차 설정
-============================================================= */
-function openWeekSettingModal() {
-  $('week-start-input').value  = fmtDate(userWeekStart);
-  $('week-range-from').value   = visibleWeekRange.from;
-  $('week-range-to').value     = visibleWeekRange.to;
-  $('week-setting-overlay').classList.add('open');
-}
-
-function closeWeekSettingModal() {
-  $('week-setting-overlay').classList.remove('open');
-}
-
-async function saveWeekSetting() {
-  const val  = $('week-start-input').value;
-  if (!val) return;
-
-  const fromVal = parseInt($('week-range-from').value) || 1;
-  const toVal   = parseInt($('week-range-to').value)   || 12;
-  if (fromVal < 1 || toVal > 24 || fromVal > toVal) {
-    alert('주차 범위가 올바르지 않습니다. (1~24 사이, 시작 ≤ 끝)');
-    return;
-  }
-
-  const saveBtn = $('week-setting-save-btn');
-  saveBtn.disabled = true;
-  saveBtn.textContent = '저장 중...';
-
-  const { error } = await sb
-    .from('profiles')
-    .update({ week_start_date: val })
-    .eq('id', currentUser.id);
-
-  saveBtn.disabled = false;
-  saveBtn.textContent = '저장';
-
-  if (error) { console.error('saveWeekSetting:', error); return; }
-
-  userWeekStart = new Date(val);
-  visibleWeekRange = { from: fromVal, to: toVal };
-  saveWeekRange();
-  activeWeek = detectWeekFromDate(todayStr);
-  closeWeekSettingModal();
-  renderSchedule();
-}
-
-/* =============================================================
    13. 인증
 ============================================================= */
 function showAuthScreen() {
@@ -1765,25 +1173,14 @@ function hideAuthScreen() {
   $('auth-screen').classList.add('hidden');
 }
 
-function usernameToEmail(username) {
-  return username.toLowerCase() + '@suran.app';
-}
-
 async function handleAuth(e) {
   e.preventDefault();
-  const username  = $('auth-username').value.trim();
+  const email     = $('auth-email').value.trim();
   const password  = $('auth-password').value;
   const tab       = document.querySelector('.auth-tab--active').dataset.authTab;
   const errorEl   = $('auth-error');
   const submitBtn = $('auth-submit-btn');
 
-  if (!username) {
-    errorEl.style.color = 'var(--delayed)';
-    errorEl.textContent = '아이디를 입력해주세요.';
-    return;
-  }
-
-  const email = usernameToEmail(username);
   errorEl.textContent = '';
   submitBtn.disabled  = true;
   submitBtn.textContent = '처리 중...';
@@ -1816,60 +1213,19 @@ function bindEvents() {
   eventsBound = true;
 
   // 사이드바 뷰 전환
-  document.querySelectorAll('.menu-btn').forEach(btn => {
-    if (!btn.dataset.view) return;
-    btn.addEventListener('click', () => switchView(btn.dataset.view));
-  });
-  $('sidebar-brand').addEventListener('click', () => switchView('schedule'));
-
-  // 과목 필터 (이벤트 위임)
-  $('subject-filter').addEventListener('click', e => {
-    const btn = e.target.closest('.subject-btn');
-    if (!btn) return;
-    $('subject-filter').querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    activeSubject = btn.dataset.subject;
-    renderSchedule();
-  });
-
-  // 마이 팝업 (모바일)
-  $('mob-my-btn').addEventListener('click', openMobMyPopup);
-  $('mob-my-overlay').addEventListener('click', e => { if (e.target === $('mob-my-overlay')) closeMobMyPopup(); });
-  $('mob-my-logout-btn').addEventListener('click', () => { closeMobMyPopup(); $('logout-btn').click(); });
-
-  // 설정 버튼
-  $('settings-btn').addEventListener('click', openSettingsModal);
-  $('settings-close-btn').addEventListener('click', closeSettingsModal);
-  $('settings-overlay').addEventListener('click', e => { if (e.target === $('settings-overlay')) closeSettingsModal(); });
-  document.querySelectorAll('.settings-tab').forEach(tab =>
-    tab.addEventListener('click', () => switchSettingsTab(tab.dataset.stab))
+  document.querySelectorAll('.menu-btn').forEach(btn =>
+    btn.addEventListener('click', () => switchView(btn.dataset.view))
   );
-  $('theme-dark-btn').addEventListener('click',  () => applyTheme('dark'));
-  $('theme-light-btn').addEventListener('click', () => applyTheme('light'));
-  $('pw-save-btn').addEventListener('click', savePassword);
-  $('label-save-btn').addEventListener('click', saveLabels);
-  $('new-subject-add-btn').addEventListener('click', addCustomSubject);
-  $('new-subject-input').addEventListener('keydown', e => { if (e.key === 'Enter') addCustomSubject(); });
 
-  // 이모지 피커
-  $('emoji-pick-btn').addEventListener('click', e => {
-    e.stopPropagation();
-    const dropdown = $('emoji-picker-dropdown');
-    const rect = $('emoji-pick-btn').getBoundingClientRect();
-    dropdown.style.left = rect.left + 'px';
-    dropdown.style.top  = (rect.top - 8) + 'px';
-    dropdown.style.transform = 'translateY(-100%)';
-    dropdown.classList.toggle('open');
-  });
-  $('emoji-picker-dropdown').addEventListener('click', e => {
-    const emoji = e.target.textContent.trim();
-    if (!emoji) return;
-    $('emoji-pick-btn').textContent = emoji;
-    $('emoji-picker-dropdown').classList.remove('open');
-  });
-  document.addEventListener('click', () => {
-    $('emoji-picker-dropdown')?.classList.remove('open');
-  });
+  // 과목 필터
+  document.querySelectorAll('.subject-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeSubject = btn.dataset.subject;
+      renderSchedule();
+    })
+  );
 
   // 달력 클릭 (이벤트 바 or 날짜 셀)
   $('cal-grid').addEventListener('click', e => {
@@ -1879,9 +1235,9 @@ function bindEvents() {
       const subject = bar.dataset.subject;
       if (!week) return;
       activeWeek    = week;
-      activeSubject = computeUserSubjects()[subject] ? subject : 'all';
-      $('subject-filter').querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
-      const matchBtn = $('subject-filter').querySelector(`.subject-btn[data-subject="${activeSubject}"]`);
+      activeSubject = SUBJECTS[subject] ? subject : 'all';
+      document.querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
+      const matchBtn = document.querySelector(`.subject-btn[data-subject="${activeSubject}"]`);
       if (matchBtn) matchBtn.classList.add('active');
       switchView('schedule');
       renderSchedule();
@@ -1930,36 +1286,9 @@ function bindEvents() {
     if (e.target === $('daily-check-overlay')) closeDailyCheckModal();
   });
 
-  // 주차 슬라이드 (데스크톱 화살표 — 모바일에선 CSS로 숨김)
+  // 주차 슬라이드
   $('week-prev').addEventListener('click', () => { $('week-tabs').scrollLeft -= 200; });
   $('week-next').addEventListener('click', () => { $('week-tabs').scrollLeft += 200; });
-
-  // 마우스 드래그 슬라이드 (과목필터 + 주차탭)
-  function addDragScroll(el) {
-    let isDown = false, startX, scrollStart;
-    el.addEventListener('mousedown', e => {
-      isDown = true; startX = e.pageX - el.offsetLeft; scrollStart = el.scrollLeft;
-      el.style.cursor = 'grabbing';
-    });
-    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = ''; });
-    el.addEventListener('mouseup',    () => { isDown = false; el.style.cursor = ''; });
-    el.addEventListener('mousemove',  e => {
-      if (!isDown) return;
-      e.preventDefault();
-      el.scrollLeft = scrollStart - (e.pageX - el.offsetLeft - startX);
-    });
-  }
-  addDragScroll($('subject-filter'));
-  addDragScroll($('week-tabs'));
-
-  // 주차 설정 모달
-  $('week-setting-btn').addEventListener('click', openWeekSettingModal);
-  $('week-setting-close-btn').addEventListener('click', closeWeekSettingModal);
-  $('week-setting-cancel-btn').addEventListener('click', closeWeekSettingModal);
-  $('week-setting-save-btn').addEventListener('click', saveWeekSetting);
-  $('week-setting-overlay').addEventListener('click', e => {
-    if (e.target === $('week-setting-overlay')) closeWeekSettingModal();
-  });
 
   // 주차 변경 → 날짜 자동
   $('f-week').addEventListener('change', () => {
@@ -2004,47 +1333,15 @@ function bindEvents() {
     $('bug-char-count').textContent = `${$('bug-message').value.length} / 500`;
   });
 
-  // 공지 등록
-  $('notice-submit-btn').addEventListener('click', submitNotice);
-
-  // 공지 미리보기 (작성 폼)
-  $('notice-preview-btn').addEventListener('click', () => {
-    const content = $('notice-content').value.trim();
-    if (!content) { alert('내용을 먼저 입력해주세요.'); return; }
-    showNoticePreview(content, '작성 중인 내용입니다');
-  });
-
-  // 업데이트 공지 양식 버튼
-  $('notice-template-btn').addEventListener('click', () => {
-    const today = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
-    $('notice-content').value =
-`업데이트 안내
-
-ver.
-
-📅 ${today}
-
-─────────────────────
-✅
-✅
-✅
-─────────────────────
-
-항상 이용해 주셔서 감사합니다 🙏`;
-    $('notice-content').focus();
-  });
-
   // 관리자 탭 전환
   document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('admin-tab--active'));
       tab.classList.add('admin-tab--active');
       const which = tab.dataset.adminTab;
-      $('admin-tab-users').style.display   = which === 'users'   ? '' : 'none';
-      $('admin-tab-bugs').style.display    = which === 'bugs'    ? '' : 'none';
-      $('admin-tab-notices').style.display = which === 'notices' ? '' : 'none';
-      if (which === 'bugs')    loadAndRenderBugReports();
-      if (which === 'notices') renderAdminNotices();
+      $('admin-tab-users').style.display = which === 'users' ? '' : 'none';
+      $('admin-tab-bugs').style.display  = which === 'bugs'  ? '' : 'none';
+      if (which === 'bugs') loadAndRenderBugReports();
     });
   });
 
@@ -2093,7 +1390,7 @@ async function onLogin(user) {
   viewingUserId = null;
 
   // 인증 즉시 화면 전환 + 빈 상태 렌더 (주차 탭 등 UI 바로 표시)
-  $('sidebar-email').textContent = (user.email || '').replace('@suran.app', '') + ' 님';
+  $('sidebar-email').textContent = user.email || '';
   setTodayLabel();
   initColorSwatches();
   hideAuthScreen();
@@ -2103,36 +1400,13 @@ async function onLogin(user) {
     // 프로필 조회 (admin 여부 확인)
     console.log('[profile] 조회 시작, uid:', user.id);
     const { data: profile, error: profileError } = await Promise.race([
-      sb.from('profiles').select('is_admin, email, week_start_date, created_at, schedule_label, calendar_label, custom_subjects').eq('id', user.id).maybeSingle(),
+      sb.from('profiles').select('is_admin, email').eq('id', user.id).maybeSingle(),
       new Promise(res => setTimeout(() => res({ data: null, error: new Error('profile 타임아웃') }), 6000)),
     ]);
     console.log('[profile] 결과:', { profile, error: profileError?.message });
 
     isAdmin = profile?.is_admin ?? false;
-    if (profile?.email) $('sidebar-email').textContent = profile.email.replace('@suran.app', '') + ' 님';
-
-    // 1주차 시작일 설정
-    const weekStartStr = profile?.week_start_date
-      || getMondayOfWeek(profile?.created_at || user.created_at || todayStr);
-    userWeekStart = new Date(weekStartStr);
-
-    // suran 계정은 주차 범위 기본값 24주차
-    if (!localStorage.getItem('weekRange')) {
-      const username = (profile?.email || user.email || '').replace('@suran.app', '');
-      if (username === 'suran') {
-        visibleWeekRange = { from: 1, to: 24 };
-        saveWeekRange();
-      }
-    }
-
-    // 유저 설정 적용
-    userSettings.scheduleLabel = profile?.schedule_label || '공부 스케줄';
-    userSettings.calendarLabel = profile?.calendar_label || '공부 달력';
-    const cs = profile?.custom_subjects;
-    if (cs) userSettings.customSubjects = { hidden: cs.hidden || [], extras: cs.extras || [] };
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    applyTheme(savedTheme);
-    updateMenuLabels();
+    if (profile?.email) $('sidebar-email').textContent = profile.email;
     $('admin-menu-item').style.display = isAdmin ? '' : 'none';
     console.log('[profile] isAdmin:', isAdmin);
 
@@ -2146,7 +1420,6 @@ async function onLogin(user) {
       await loadCourses(user.id);
       activeWeek = detectWeekFromDate(todayStr);
       renderSchedule();
-      checkAndShowNotice();
     }
   } catch (err) {
     console.error('[onLogin] 오류:', err);
@@ -2171,7 +1444,7 @@ function init() {
       // 로그인 직후 → 화면만 즉시 전환 (쿼리 X, INITIAL_SESSION에서 처리)
       if (session?.user && !loggingIn) {
         hideAuthScreen();
-        $('sidebar-email').textContent = (session.user.email || '').replace('@suran.app', '') + ' 님';
+        $('sidebar-email').textContent = session.user.email || '';
       }
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
