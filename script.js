@@ -2168,10 +2168,9 @@ function init() {
       if (session?.user) await onLogin(session.user);
       else showAuthScreen();
     } else if (event === 'SIGNED_IN') {
-      // 로그인 직후 → 화면만 즉시 전환 (쿼리 X, INITIAL_SESSION에서 처리)
-      if (session?.user && !loggingIn) {
-        hideAuthScreen();
-        $('sidebar-email').textContent = (session.user.email || '').replace('@suran.app', '') + ' 님';
+      // 로그인 직후 → currentUser 없을 때만 onLogin 실행 (새로고침 시 INITIAL_SESSION 중복 방지)
+      if (session?.user && !loggingIn && !currentUser) {
+        await onLogin(session.user);
       }
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
