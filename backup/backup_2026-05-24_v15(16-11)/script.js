@@ -1790,8 +1790,9 @@ async function handleAuth(e) {
 
   try {
     if (tab === 'login') {
-      const { error } = await sb.auth.signInWithPassword({ email, password });
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      if (data?.user) await onLogin(data.user);
     } else {
       const { error } = await sb.auth.signUp({ email, password });
       if (error) throw error;
@@ -2143,6 +2144,11 @@ async function onLogin(user) {
       switchView('admin');
       refreshBugBadge();
     } else {
+      // 어드민 세션에서 숨겨진 탭 복구
+      const scheduleItem = document.querySelector('[data-view="schedule"]')?.closest('li');
+      const calendarItem = document.querySelector('[data-view="calendar"]')?.closest('li');
+      if (scheduleItem) scheduleItem.style.display = '';
+      if (calendarItem) calendarItem.style.display = '';
       await loadCourses(user.id);
       activeWeek = detectWeekFromDate(todayStr);
       renderSchedule();
@@ -2168,10 +2174,7 @@ function init() {
       if (session?.user) await onLogin(session.user);
       else showAuthScreen();
     } else if (event === 'SIGNED_IN') {
-      // 로그인 직후 → currentUser 없을 때만 onLogin 실행 (새로고침 시 INITIAL_SESSION 중복 방지)
-      if (session?.user && !loggingIn && !currentUser) {
-        await onLogin(session.user);
-      }
+      // handleAuth에서 onLogin 직접 호출하므로 여기선 처리 안 함
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       isAdmin     = false;
